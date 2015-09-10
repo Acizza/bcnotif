@@ -19,3 +19,15 @@ let create (m:Match) =
                     then Some (4 |> vFromIdx)
                     else None
     }
+
+[<Literal>]
+let private RegexString =
+    """<td class="c m">(\d+).*?<a href="/listen/feed/\d+">(.+?)</a>(<br /><br /> <div class="messageBox">(.+?)</div>)?"""
+
+let createAllFromString str =
+    let matches =
+        Regex.Matches(str, RegexString, RegexOptions.Compiled)
+        |> Seq.cast<Match>
+        |> Seq.toArray
+
+    matches |> Array.map create
