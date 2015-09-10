@@ -13,9 +13,9 @@ let create (m:Match) =
     let vFromIdx (i:int) = groups.[i].Value
 
     {
-        Name      = 1 |> vFromIdx;
-        Listeners = 2 |> vFromIdx |> int;
-        Info      = if groups.Count >= 4
+        Name      = 2 |> vFromIdx;
+        Listeners = 1 |> vFromIdx |> int;
+        Info      = if (4 |> vFromIdx).Length > 0
                     then Some (4 |> vFromIdx)
                     else None
     }
