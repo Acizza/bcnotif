@@ -6,9 +6,13 @@ open System.Net
 [<Literal>]
 let URL = "http://broadcastify.com/listen/top"
 
-let downloadFeedList() = (new WebClient()).DownloadString URL
+let downloadFeedList (url:string) = (new WebClient()).DownloadString url
+let fetchFeeds = downloadFeedList >> Feed.createAllFromString
 
-//let fetchFeeds =
+let processFeeds minListeners (feeds:Feed.Feed array) =
+    feeds
+    |> Array.filter (fun x -> x.Listeners >= minListeners)
+    |> Notification.createFromFeed
 
 [<EntryPoint>]
 let main args =
