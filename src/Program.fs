@@ -27,7 +27,11 @@ let processFeeds minListeners =
     |> Array.iteri displayRawFeed
 
 let rec processLoopEvery minListeners (delay:TimeSpan) = async {
-    processFeeds minListeners
+    try
+        processFeeds minListeners
+    with
+    | ex -> Notification.createError ex.Message
+
     do! Async.Sleep (delay.TotalMilliseconds |> int)
     return! processLoopEvery minListeners delay
 }
