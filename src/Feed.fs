@@ -31,3 +31,15 @@ let createAllFromString str =
         |> Seq.toArray
 
     matches |> Array.map create
+
+let prettify feed =
+    let getInfoStr f =
+        match f.Info with
+        | Some x -> sprintf "\nInfo: %s" x
+        | None -> ""
+
+    sprintf
+        "Name: %s\nListeners: %d%s"
+        feed.Name
+        feed.Listeners
+        (getInfoStr feed)

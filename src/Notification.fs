@@ -37,5 +37,9 @@ let create icon title body =
     notif.ShowBalloonTip(5000, title, body, tIcon)
 #endif
 
-let createFromFeed feed =
-    printfn "%A" feed
+let createFeedUpdate curIdx maxIdx =
+    create
+        Info
+        (sprintf "Broadcastify Listener Update (%d of %d)" curIdx maxIdx)
+
+let createError      = create Error "Broadcastify Update Error"

@@ -11,9 +11,16 @@ let downloadFeedList (url:string) = (new WebClient()).DownloadString url |> sani
 let fetchFeeds = downloadFeedList >> Feed.createAllFromString
 
 let processFeeds minListeners =
-    fetchFeeds URL
-    |> Array.filter (fun x -> x.Listeners >= minListeners)
-    |> Notification.createFromFeed
+    let feeds =
+        fetchFeeds URL
+        |> Array.filter (fun x -> x.Listeners >= minListeners)
+
+    let displayRawFeed idx =
+            Feed.prettify
+            >> Notification.createFeedUpdate (idx+1) feeds.Length
+
+    feeds
+    |> Array.iteri displayRawFeed
 
 [<EntryPoint>]
 let main args =
