@@ -11,7 +11,7 @@
     <AssemblyName>BcListeners</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <TargetFSharpCoreVersion>4.3.1.0</TargetFSharpCoreVersion>
+    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <Name>BcListeners</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -33,7 +33,7 @@
     <OutputPath>bin\Windows\</OutputPath>
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>bin\Release\BcListeners.XML</DocumentationFile>
+    <DocumentationFile>bin\Windows\BcListeners.XML</DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Linux|AnyCPU' ">
@@ -54,8 +54,8 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <Reference Include="System.Drawing" Condition="'$(Configuration)'=='Windows'" />
-    <Reference Include="System.Windows.Forms" Condition="'$(Configuration)'=='Windows'" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="notify-sharp" Condition="'$(Configuration)'=='Linux'" />
     <Reference Include="gdk-sharp" Condition="'$(Configuration)'=='Linux'" />
     <Reference Include="gtk-sharp" Condition="'$(Configuration)'=='Linux'" />

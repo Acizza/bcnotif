@@ -42,4 +42,4 @@ let createFeedUpdate curIdx maxIdx =
         Info
         (sprintf "Broadcastify Listener Update (%d of %d)" curIdx maxIdx)
 
-let createError      = create Error "Broadcastify Update Error"
+let createError = create Error "Broadcastify Update Error"
