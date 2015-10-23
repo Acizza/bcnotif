@@ -1,7 +1,7 @@
-# BcListeners
-Runs on Linux and Windows 8+. Requires libnotify0.4-cil on Linux.
+# bc-listeners
+Currently only runs on Linux. Requires libnotify0.4-cil.
 
 # Usage
 ```
-./BcListeners.exe <minimum listeners> <update time in minutes>
+./bc-listeners <minimum listeners to show feed> <update time in minutes>
 ```
