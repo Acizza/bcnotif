@@ -7,7 +7,7 @@ module Feed
     , getMatches
     ) where
 
-import Data.Maybe (maybe)
+import Data.Maybe (maybe, mapMaybe)
 import Text.Printf (printf)
 import Text.Regex.PCRE.Heavy
 
@@ -24,10 +24,10 @@ instance Show Feed where
             (listeners f)
             (maybe "" (printf "\nInfo: %s") (info f))
 
-create :: [String] -> Feed
-create [listeners, name] = Feed name (read listeners) Nothing
-create [listeners, name, _, info] = Feed name (read listeners) (Just info)
-create other = error $ "create usage: [listeners, name] or [listeners, name, info] " ++ show other
+create :: [String] -> Maybe Feed
+create [listeners, name] = Just $ Feed name (read listeners) Nothing
+create [listeners, name, _, info] = Just $ Feed name (read listeners) (Just info)
+create _ = Nothing
 
 getMatches :: String -> [(String, [String])]
 getMatches = scan [re|<td class="c m">(\d+).*?<a href="/listen/feed/\d+">(.+?)</a>(<br /><br /> <div class="messageBox">(.+?)</div>)?|]
@@ -40,4 +40,4 @@ replaceLines str =
     in map rep str
 
 createFromString :: String -> [Feed]
-createFromString = map (create . snd) . getMatches . replaceLines
+createFromString = mapMaybe (create . snd) . getMatches . replaceLines
