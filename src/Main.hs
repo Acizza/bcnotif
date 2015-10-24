@@ -7,6 +7,7 @@ import System.Environment (getArgs)
 import Text.Read (readMaybe)
 import Network.HTTP (simpleHTTP, getRequest, getResponseBody)
 import Text.Printf (printf)
+import Data.Maybe (isJust)
 import qualified Notification as N
 import Feed
 
@@ -15,7 +16,7 @@ downloadURL url = simpleHTTP (getRequest url) >>= getResponseBody
 
 getFeeds :: Int -> String -> [Feed]
 getFeeds minListeners =
-    filter (\x -> listeners x > minListeners) . Feed.createFromString
+    filter (\x -> listeners x > minListeners || isJust (info x)) . Feed.createFromString
 
 startUpdateLoop :: Int -> Int -> IO ()
 startUpdateLoop minListeners minsToUpdate = do

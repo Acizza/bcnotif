@@ -26,8 +26,8 @@ instance Show Feed where
 
 create :: [String] -> Feed
 create [listeners, name] = Feed name (read listeners) Nothing
-create [listeners, name, info] = Feed name (read listeners) (Just info)
-create other = error "create usage: [listeners, name] or [listeners, name, info]"
+create [listeners, name, _, info] = Feed name (read listeners) (Just info)
+create other = error $ "create usage: [listeners, name] or [listeners, name, info] " ++ show other
 
 getMatches :: String -> [(String, [String])]
 getMatches = scan [re|<td class="c m">(\d+).*?<a href="/listen/feed/\d+">(.+?)</a>(<br /><br /> <div class="messageBox">(.+?)</div>)?|]
