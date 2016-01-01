@@ -2,41 +2,53 @@
 
 module Main where
 
-import Control.Concurrent (threadDelay)
-import System.Environment (getArgs)
-import Text.Read (readMaybe)
-import Network.HTTP (simpleHTTP, getRequest, getResponseBody)
-import Text.Printf (printf)
-import Data.Maybe (isJust)
-import qualified Notification as N
 import Feed
+import Control.Concurrent (threadDelay)
+import Control.Monad (void)
+import Data.Maybe (isJust)
+import Network.HTTP (simpleHTTP, getRequest, getResponseBody)
+import Text.Read (readMaybe)
+import Text.Printf (printf)
+import System.Environment (getArgs)
+import System.IO.Error (tryIOError)
+import qualified Notification as N
 
 downloadURL :: String -> IO String
 downloadURL url = simpleHTTP (getRequest url) >>= getResponseBody
 
-getFeeds :: Int -> String -> [Feed]
-getFeeds minListeners =
-    filter (\x -> listeners x > minListeners || isJust (info x)) . Feed.createFromString
+displayFeeds :: Int -> String -> IO ()
+displayFeeds minL html =
+    mapM_ (\(i,x) ->
+        N.createFeedUpdate
+            (createTitle i $ length feeds)
+            (show x)
+        ) feeds
+    where
+        createTitle = printf "Broadcastify Listener Update (%d of %d)"
+        feeds =
+            zip [(1::Int)..]
+             . filter (\x -> listeners x > minL || isJust (info x))
+             . Feed.createFromString
+             $ html
 
-startUpdateLoop :: Int -> Int -> IO ()
-startUpdateLoop minListeners minsToUpdate = do
-    str <- downloadURL "http://www.broadcastify.com/listen/top"
+runLoop :: Int -> Int -> IO ()
+runLoop minL delayMin = do
+    result <- tryIOError $ downloadURL "http://www.broadcastify.com/listen/top"
+    case result of
+        Left err -> void (N.createError $ show err)
+        Right html -> displayFeeds minL html
 
-    let feeds = zip [1..] . getFeeds minListeners $ str
-    let getTitle i = printf "Broadcastify Listener Update (%d of %d)" (i :: Int) (length feeds :: Int)
-    mapM_ (\(i,x) -> N.createFeedUpdate (getTitle i) (show x)) feeds
-
-    threadDelay $ 1000000 * 60 * minsToUpdate
-    startUpdateLoop minListeners minsToUpdate
+    threadDelay $ 1000000 * 60 * delayMin
+    runLoop minL delayMin
 
 main :: IO ()
 main = do
     args <- getArgs
     case args of
-        [_, readMaybe -> Just minsToUpdate] | minsToUpdate < 5.0 ->
+        [_, readMaybe -> Just minsToUpdate] | minsToUpdate < (5 :: Int) ->
             putStrLn "Update time must be >= 5 minutes"
         [readMaybe -> Just minListeners, readMaybe -> Just minsToUpdate] ->
-            startUpdateLoop minListeners minsToUpdate
-        otherwise -> do
+            runLoop minListeners minsToUpdate
+        _ -> do
             putStrLn "Usage: <minimum listeners> <update time in minutes>"
-            startUpdateLoop 325 10
+            runLoop 325 10

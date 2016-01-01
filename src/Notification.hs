@@ -1,8 +1,7 @@
 module Notification
-    ( create
-    , createError
-    , createFeedUpdate
-    ) where
+( createError
+, createFeedUpdate
+) where
 
 import Libnotify
 

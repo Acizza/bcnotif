@@ -1,13 +1,12 @@
 {-# LANGUAGE QuasiQuotes, FlexibleContexts #-}
 
 module Feed
-    ( Feed(..)
-    , create
-    , createFromString
-    , getMatches
-    ) where
+( Feed(..)
+, createFromString
+) where
 
-import Data.Maybe (maybe, mapMaybe)
+import Data.Maybe (mapMaybe)
+import Data.String.Utils (replace)
 import Text.Printf (printf)
 import Text.Regex.PCRE.Heavy
 
@@ -25,19 +24,12 @@ instance Show Feed where
             (maybe "" (printf "\nInfo: %s") (info f))
 
 create :: [String] -> Maybe Feed
-create [listeners, name] = Just $ Feed name (read listeners) Nothing
-create [listeners, name, _, info] = Just $ Feed name (read listeners) (Just info)
+create [listeners', name'] = Just $ Feed name' (read listeners') Nothing
+create [listeners', name', _, info'] = Just $ Feed name' (read listeners') (Just info')
 create _ = Nothing
 
 getMatches :: String -> [(String, [String])]
 getMatches = scan [re|<td class="c m">(\d+).*?<a href="/listen/feed/\d+">(.+?)</a>(<br /><br /> <div class="messageBox">(.+?)</div>)?|]
 
-replaceLines :: String -> String
-replaceLines str =
-    let
-        rep '\n' = ' '
-        rep c = c
-    in map rep str
-
 createFromString :: String -> [Feed]
-createFromString = mapMaybe (create . snd) . getMatches . replaceLines
+createFromString = mapMaybe (create . snd) . getMatches . replace "\n" " "
