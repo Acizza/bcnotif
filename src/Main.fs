@@ -2,6 +2,7 @@ module Main
 
 open System
 open System.Net
+open System.IO
 open System.Threading
 open Feed
 
@@ -46,18 +47,30 @@ let processFeeds threshold prevFeeds feeds =
 
 /// Starts the processing loop to fetch and display feeds
 let runLoop threshold (updateTime:TimeSpan) =
-    let rec run = function
-        | xs when Array.length xs > 5 ->
-            Array.tail xs |> run
+    // TODO: Hard-coded number of averages!
+    let rec run timesSinceSave = function
+        | xs when timesSinceSave >= 5 ->
+            PreviousData.save PreviousData.filePath xs
+            run 0 xs
+        | xs when Array.length xs >= 5 ->
+            Array.tail xs |> run timesSinceSave
         | prevFeeds ->
                 let feeds =
                     getFeeds ()
                     |> processFeeds threshold prevFeeds
 
                 Thread.Sleep (updateTime.TotalMilliseconds |> int)
-                run feeds
+                run (timesSinceSave+1) feeds
 
-    run [||]
+    let pastListeners =
+        try
+            PreviousData.getOrCreate PreviousData.filePath [||]
+        with
+        | ex ->
+            Notification.createError ex.Message
+            [||]
+
+    run 0 pastListeners
 
 [<EntryPoint>]
 let main args =
@@ -69,7 +82,7 @@ let main args =
     let (|Minutes|_|) =
         tryParse Double.TryParse
         >> Option.map TimeSpan.FromMinutes
-        
+
     /// Returns a percentage as a multiplier
     let (|Threshold|_|) =
         tryParse Double.TryParse
@@ -82,5 +95,5 @@ let main args =
         runLoop threshold updateTime
     | _ ->
         Console.WriteLine "Usage: <percentage jump to display feed> <update time in minutes>"
-        runLoop 35. (TimeSpan.FromMinutes 6.)
+        runLoop 30. (TimeSpan.FromMinutes 6.)
     0
