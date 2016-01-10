@@ -71,10 +71,14 @@ module PreviousData =
 
     /// Loads data from the specified CSV file
     let load (path:string) =
-        let csv = CsvFile.Load(path, hasHeaders=false).Cache()
-        csv.Rows
-        |> Seq.toArray
-        |> Array.map (fun xs -> (xs.[0], xs.Columns.[1..]))
+        // Avoids an exception with an empty file
+        if (new FileInfo(path)).Length <> 0L then
+            let csv = CsvFile.Load(path, hasHeaders=false).Cache()
+            csv.Rows
+            |> Seq.toArray
+            |> Array.map (fun xs -> (xs.[0], xs.Columns.[1..]))
+        else
+            [||]
 
     /// Loads data from the specified CSV file and transforms them into an array of feeds
     let loadToFeeds path =
