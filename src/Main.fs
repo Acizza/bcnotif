@@ -38,8 +38,15 @@ let processFeeds threshold prevFeeds feeds =
         #endif
 
     Array.iteri (fun i x ->
+        let idx =
+            #if WINDOWS // Reverse index on Windows to accommodate for the FILO method
+            feeds'.Length-i
+            #else
+            i+1
+            #endif
+
         Notification.createUpdate
-            (i+1)
+            idx
             (Array.length feeds')
             (x.ToString())
     ) feeds'
@@ -47,7 +54,6 @@ let processFeeds threshold prevFeeds feeds =
 
 /// Starts the processing loop to fetch and display feeds
 let runLoop threshold (updateTime:TimeSpan) =
-    // TODO: Hard-coded number of averages!
     let rec run timesSinceSave = function
         | xs when timesSinceSave >= 5 ->
             PreviousData.save PreviousData.filePath xs
