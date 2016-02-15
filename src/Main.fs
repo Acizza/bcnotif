@@ -26,18 +26,18 @@ let processFeeds threshold prevFeeds feeds =
     let avg      = Feed.getAverageListeners allFeeds
 
     let isPastAverage f =
-        match Map.tryFind f.name avg with
-        | Some x -> float f.listeners >= x * threshold
+        match Map.tryFind f.Name avg with
+        | Some x -> float f.Listeners >= x * threshold
         | None   -> false
 
     let feeds' =
         feeds
-        |> Array.filter (fun x -> isPastAverage x || Option.isSome x.info)
+        |> Array.filter (fun x -> isPastAverage x || Option.isSome x.Info)
         #if WINDOWS // Windows displays notifications as FILO; Linux displays them as FIFO
         |> Array.rev
         #endif
 
-    Array.iteri (fun i x ->
+    let create i x =
         let idx =
             #if WINDOWS // Reverse index on Windows to accommodate for the FILO method
             feeds'.Length-i
@@ -49,7 +49,8 @@ let processFeeds threshold prevFeeds feeds =
             idx
             (Array.length feeds')
             (x.ToString())
-    ) feeds'
+
+    Array.iteri create feeds'
     allFeeds
 
 /// Starts the processing loop to fetch and display feeds

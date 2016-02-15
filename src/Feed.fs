@@ -6,9 +6,9 @@ open System.IO
 open FSharp.Data
 
 type Feed = {
-    name      : string
-    listeners : int
-    info      : string option
+    Name      : string
+    Listeners : int
+    Info      : string option
 } with
     override x.ToString() =
         let maybe def f = function
@@ -16,18 +16,18 @@ type Feed = {
             | None -> def
 
         sprintf "Name: %s\nListeners: %d%s"
-            x.name
-            x.listeners
-            (maybe "" (sprintf "\nInfo: %s") x.info)
+            x.Name
+            x.Listeners
+            (maybe "" (sprintf "\nInfo: %s") x.Info)
 
 /// Creates an array of feeds from HTML
 let createFromString str =
     let create (m:Match) =
         let value (i:int) = m.Groups.[i].Value
         {
-            listeners = 1 |> value |> int
-            name      = 2 |> value
-            info      = if (4 |> value).Length > 0
+            Listeners = 1 |> value |> int
+            Name      = 2 |> value
+            Info      = if (4 |> value).Length > 0
                         then Some <| value 4
                         else None
         }
@@ -41,9 +41,9 @@ let createFromString str =
 let getAverageListeners feeds =
     feeds
     |> Array.concat
-    |> Array.groupBy (fun x -> x.name)
+    |> Array.groupBy (fun x -> x.Name)
     |> Array.map (fun (name, arr) ->
-        (name, Array.averageBy (fun x -> float x.listeners) arr)
+        (name, Array.averageBy (fun x -> float x.Listeners) arr)
     )
     |> Map.ofArray
 
@@ -58,9 +58,9 @@ module PreviousData =
         let data =
             feeds
             |> Array.concat
-            |> Array.groupBy (fun x -> x.name)
+            |> Array.groupBy (fun x -> x.Name)
             |> Array.map (fun (name, values) ->
-                (name, Array.map (fun x -> string x.listeners) values)
+                (name, Array.map (fun x -> string x.Listeners) values)
             )
             |> Array.filter (fun (_, listeners) -> listeners.Length >= 5) // TODO: Hard-coded number of averages!
             |> Array.map (fun (name, listeners) ->
@@ -86,9 +86,9 @@ module PreviousData =
         |> Array.map (fun (name, values) ->
             Array.map (fun listeners ->
                 {
-                    name      = name
-                    listeners = int listeners
-                    info      = None
+                    Name      = name
+                    Listeners = int listeners
+                    Info      = None
                 }) values
         )
 
