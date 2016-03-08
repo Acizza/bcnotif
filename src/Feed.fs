@@ -1,6 +1,7 @@
 module Feed
 
 open System
+open System.Net
 open System.Text.RegularExpressions
 open System.IO
 open FSharp.Data
@@ -9,16 +10,7 @@ type Feed = {
     Name      : string
     Listeners : int
     Info      : string option
-} with
-    override x.ToString() =
-        let maybe def f = function
-            | Some x -> f x
-            | None -> def
-
-        sprintf "Name: %s\nListeners: %d%s"
-            x.Name
-            x.Listeners
-            (maybe "" (sprintf "\nInfo: %s") x.Info)
+}
 
 /// Creates an array of feeds from HTML
 let createFromString str =
@@ -35,68 +27,83 @@ let createFromString str =
     let regex = """<td class="c m">(\d+).*?<a href="/listen/feed/\d+">(.+?)</a>(<br /><br /> <div class="messageBox">(.+?)</div>)?"""
     Regex.Matches(str, regex, RegexOptions.Compiled)
     |> Seq.cast<Match>
+    |> Seq.map create
     |> Seq.toArray
-    |> Array.map create
 
-let getAverageListeners feeds =
-    feeds
-    |> Array.concat
-    |> Array.groupBy (fun x -> x.Name)
-    |> Array.map (fun (name, arr) ->
-        (name, Array.averageBy (fun x -> float x.Listeners) arr)
-    )
-    |> Map.ofArray
+let createFromURL (url : string) =
+    use c = new WebClient()
+    c.DownloadString(url)
+        .Trim()
+        .Replace("\n", " ")
+    |> createFromString
 
-module PreviousData =
+let createNotif feed index numFeeds =
+    let infoStr =
+        match feed.Info with
+        | Some s -> sprintf "\nInfo: %s" s
+        | None -> ""
+
+    Notification.createUpdate
+        index
+        numFeeds
+        (sprintf "Name: %s\nListeners: %d%s" feed.Name feed.Listeners infoStr)
+
+module Averages =
+    type T = Map<string, int list>
+
     let filePath =
         AppDomain.CurrentDomain.BaseDirectory
         + "prevlisteners.csv"
 
-    /// Transforms an array of feeds to a CSV-friendly format and
-    /// writes them to the specified path
-    let save path feeds =
+    let getAverageListeners feed avgs =
+        Map.tryFind feed.Name avgs
+        |> Option.map (List.averageBy float)
+
+    let isPastAverage feed avgs =
+        match getAverageListeners feed avgs with
+        | Some avg -> float feed.Listeners >= avg * 1.3
+        | None -> false
+
+    /// Transforms a map containing average listeners and saves it to the CSV file
+    let save (avgs : T) =
         let data =
-            feeds
-            |> Array.concat
-            |> Array.groupBy (fun x -> x.Name)
-            |> Array.map (fun (name, values) ->
-                (name, Array.map (fun x -> string x.Listeners) values)
-            )
-            |> Array.filter (fun (_, listeners) -> listeners.Length >= 5) // TODO: Hard-coded number of averages!
+            avgs
+            |> Map.toArray
+            |> Array.filter (fun (_, l) -> l.Length >= 5)
             |> Array.map (fun (name, listeners) ->
-                (sprintf "\"%s\"," <| name.Trim()) + (String.concat "," listeners)
+                let listeners = List.map string listeners
+
+                sprintf "\"%s\",%s"
+                    <| name.Trim()
+                    <| String.concat "," listeners
             )
 
-        File.WriteAllLines(path, data)
+        File.WriteAllLines(filePath, data)
 
-    /// Loads data from the specified CSV file
-    let load (path:string) =
-        // Avoids an exception with an empty file
-        if (new FileInfo(path)).Length <> 0L then
-            let csv = CsvFile.Load(path, hasHeaders=false).Cache()
-            csv.Rows
-            |> Seq.toArray
-            |> Array.map (fun xs -> (xs.[0], xs.Columns.[1..]))
-        else
-            [||]
+    /// Creates the file specified if it doesn't exist, returns the length otherwise
+    let private touchFile path =
+        let info = FileInfo path
 
-    /// Loads data from the specified CSV file and transforms them into an array of feeds
-    let loadToFeeds path =
-        load path
-        |> Array.map (fun (name, values) ->
-            Array.map (fun listeners ->
-                {
-                    Name      = name
-                    Listeners = int listeners
-                    Info      = None
-                }) values
-        )
-
-    /// Loads feeds from the specified CSV file if it exists; otherwise,
-    /// creates the file with the specified feeds
-    let getOrCreate path feeds =
-        match File.Exists path with
-        | true  -> loadToFeeds path
+        match info.Exists with
+        | true -> info.Length
         | false ->
-            save path feeds
-            [||]
+            use f = File.Create(path)
+            0L
+
+    /// Loads the CSV file containing previous listener data
+    let load () =
+        let length = touchFile filePath
+
+        if length <> 0L then
+            CsvFile.Load(filePath, hasHeaders=false).Rows
+            |> Seq.map (fun xs ->
+                let columns =
+                    xs.Columns.[1..]
+                    |> Array.map int
+                    |> Array.toList
+
+                (xs.[0], columns)
+            )
+            |> Map.ofSeq
+        else
+            Map.empty
