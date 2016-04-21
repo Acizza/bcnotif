@@ -49,34 +49,22 @@ let createNotif feed index numFeeds =
         (sprintf "Name: %s\nListeners: %d%s" feed.Name feed.Listeners infoStr)
 
 module Averages =
-    type T = Map<string, int list>
-
     let filePath =
         AppDomain.CurrentDomain.BaseDirectory
         + "prevlisteners.csv"
 
-    let getAverageListeners feed avgs =
-        Map.tryFind feed.Name avgs
-        |> Option.map (List.averageBy float)
-
-    let isPastAverage feed avgs =
-        match getAverageListeners feed avgs with
-        | Some avg -> float feed.Listeners >= avg * 1.3
-        | None -> false
-
-    /// Transforms a map containing average listeners and saves it to the CSV file
-    let save (avgs : T) =
+    /// Saves hourly averages to a CSV file
+    let saveHourly (avgs : (string * int array) seq) =
         let data =
             avgs
-            |> Map.toArray
-            |> Array.filter (fun (_, l) -> l.Length >= 5)
-            |> Array.map (fun (name, listeners) ->
-                let listeners = List.map string listeners
-
+            //|> Seq.filter (fun (_, avg) -> avg.Length = 25)
+            |> Seq.map (fun (name, avg) ->
+                let listeners = Array.map string avg
                 sprintf "\"%s\",%s"
                     <| name.Trim()
                     <| String.concat "," listeners
             )
+            |> Array.ofSeq
 
         File.WriteAllLines(filePath, data)
 
@@ -90,8 +78,8 @@ module Averages =
             use f = File.Create(path)
             0L
 
-    /// Loads the CSV file containing previous listener data
-    let load () =
+    /// Loads the CSV file containing hourly averages
+    let loadHourly () =
         let length = touchFile filePath
 
         if length <> 0L then
@@ -100,10 +88,8 @@ module Averages =
                 let columns =
                     xs.Columns.[1..]
                     |> Array.map int
-                    |> Array.toList
 
                 (xs.[0], columns)
             )
-            |> Map.ofSeq
         else
-            Map.empty
+            seq []
