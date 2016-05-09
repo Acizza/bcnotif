@@ -63,6 +63,7 @@
     <Reference Include="gtk-sharp" Condition="'$(Configuration)'=='Linux'" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="src/Average.fs" />
     <Compile Include="src/Notification.fs" />
     <Compile Include="src/Feed.fs" />
     <Compile Include="src/Program.fs" />

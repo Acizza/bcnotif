@@ -12,7 +12,7 @@ type Feed = {
     Info      : string option
 }
 
-/// Creates an array of feeds from HTML
+/// Parses all feeds from HTML
 let createFromString str =
     let create (m:Match) =
         let value (i:int) = m.Groups.[i].Value
@@ -47,49 +47,3 @@ let createNotif feed index numFeeds =
         index
         numFeeds
         (sprintf "Name: %s\nListeners: %d%s" feed.Name feed.Listeners infoStr)
-
-module Averages =
-    let filePath =
-        AppDomain.CurrentDomain.BaseDirectory
-        + "prevlisteners.csv"
-
-    /// Saves hourly averages to a CSV file
-    let saveHourly (avgs : (string * int array) seq) =
-        let data =
-            avgs
-            //|> Seq.filter (fun (_, avg) -> avg.Length = 25)
-            |> Seq.map (fun (name, avg) ->
-                let listeners = Array.map string avg
-                sprintf "\"%s\",%s"
-                    <| name.Trim()
-                    <| String.concat "," listeners
-            )
-            |> Array.ofSeq
-
-        File.WriteAllLines(filePath, data)
-
-    /// Creates the file specified if it doesn't exist, returns the length otherwise
-    let private touchFile path =
-        let info = FileInfo path
-
-        match info.Exists with
-        | true -> info.Length
-        | false ->
-            use f = File.Create(path)
-            0L
-
-    /// Loads the CSV file containing hourly averages
-    let loadHourly () =
-        let length = touchFile filePath
-
-        if length <> 0L then
-            CsvFile.Load(filePath, hasHeaders=false).Rows
-            |> Seq.map (fun xs ->
-                let columns =
-                    xs.Columns.[1..]
-                    |> Array.map int
-
-                (xs.[0], columns)
-            )
-        else
-            seq []

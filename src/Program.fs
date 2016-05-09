@@ -1,86 +1,81 @@
 module Main
 
 open System
+open System.Collections.Generic
 open System.Threading
 open Feed
-
-type Averages = {
-    Moving : int list
-    Hourly : int array
-}
+open Average
 
 let showFeeds feeds =
     let create i f =
         let idx =
-            // Reverse notification index on Windows to accommodate for its display order
+            // Reverse notif. index on Windows to accommodate for its display order
             #if WINDOWS
-            feeds'.Length-i
+            feeds.Length-i
             #else
             i+1
             #endif
 
         Feed.createNotif f idx (Array.length feeds)
 
-    feeds |> Array.iteri create
+    feeds
+    #if WINDOWS // Windows displays notifications in a reversed order
+    |> Array.rev
+    #endif
+    |> Array.iteri create
 
-let updateFeedAvg curHour avg feed =
-    let hourlyAvg = avg.Hourly.[curHour]
-    let newMoving =
-        match avg.Moving with
-        | xs when xs.Length < 5 -> feed.Listeners :: xs
-        | xs -> feed.Listeners :: xs.[..xs.Length - 2]
-        | _  -> if hourlyAvg = 0 then [feed.Listeners] else [hourlyAvg]
+let updateAverages hour (avgs : Dictionary<_, _>) =
+    Array.iter (fun f ->
+        let update = Average.update hour 5 f.Listeners
+        let name   = f.Name
 
-    avg.Hourly.[curHour] <- newMoving |> List.averageBy float |> int
-    {avg with Moving = newMoving}
+        if avgs.ContainsKey name
+        then avgs.[name] <- avgs.[name] |> update
+        else avgs.Add(name, Average.create 24 |> update)
+    )
 
 /// Filters feeds by a threshold and displays them as notifications
-let processFeeds threshold avgs =
+let processFeeds threshold (avgs : Dictionary<_, _>) =
     let feeds = Feed.createFromURL "http://www.broadcastify.com/listen/top"
     let hour  = DateTime.UtcNow.Hour
 
-    let newAvgs =
-        Array.map (fun f ->
-            let avg =
-                match Array.tryFind (fun (n, _) -> n = f.Name) avgs with
-                | Some (_, x) -> x
-                | None -> {Moving = []; Hourly = Array.zeroCreate 25}
-            (f, updateFeedAvg hour avg f)
-        ) feeds
-        
-    newAvgs
-    |> Array.filter (fun (f, avg) ->
-        float f.Listeners >= float avg.Hourly.[hour] * threshold ||
-        Option.isSome f.Info
+    let isPastAverage f avg =
+        float f.Listeners >= float avg.Hourly.[hour] * threshold
+
+    updateAverages hour avgs feeds
+
+    feeds
+    |> Array.choose (fun f ->
+        match avgs.TryGetValue f.Name with
+        | (true, avg) -> Some (f, avg)
+        | (false, _)  -> None
     )
-    #if WINDOWS // Windows displays notifications as FILO; Linux displays them as FIFO
-    |> Array.rev
-    #endif
+    |> Array.filter (fun (f, avg) -> isPastAverage f avg || Option.isSome f.Info)
     |> Array.map fst
     |> showFeeds
-
-    newAvgs
-    |> Array.map (fun (f, avg) -> (f.Name, avg))
+    
+    avgs
 
 let processLoop threshold (updateTime : TimeSpan) =
     let rec update avgs =
         let newAvgs = processFeeds threshold avgs
 
         newAvgs
-        |> Array.map (fun (n, avg) -> (n, avg.Hourly))
-        |> Averages.saveHourly
+        |> Seq.map (fun (KeyValue(n, avg)) -> (n, avg))
+        |> Average.saveHourly
 
         Thread.Sleep (int updateTime.TotalMilliseconds)
         update newAvgs
 
-    let initialAverages =
-        Averages.loadHourly ()
-        |> Seq.map (fun (f, avgs) ->
-            (f, { Moving = []; Hourly = avgs })
-        )
-        |> Seq.toArray
+    let avgs = new Dictionary<string, Average.T>()
 
-    update initialAverages
+    Average.loadHourly ()
+    |> Seq.iter (fun (n, avg) ->
+        if avgs.ContainsKey n |> not
+        then avgs.Add(n, Average.createWithHourly avg)
+    )
+
+    update avgs
 
 [<EntryPoint>]
 let main args =
