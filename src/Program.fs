@@ -1,10 +1,10 @@
 module Main
 
-open System
-open System.Collections.Generic
-open System.Threading
-open Feed
 open Average
+open Feed
+open System
+open System.Threading
+open Util
 
 let showFeeds feeds =
     let create i f =
@@ -24,80 +24,63 @@ let showFeeds feeds =
     #endif
     |> Array.iteri create
 
-let updateAverages hour (avgs : Dictionary<_, _>) =
-    Array.iter (fun f ->
-        let update = Average.update hour 5 f.Listeners
-        let name   = f.Name
+let averagesPath =
+    sprintf "%s%s"
+        AppDomain.CurrentDomain.BaseDirectory
+        "averages.csv"
 
-        if avgs.ContainsKey name
-        then avgs.[name] <- avgs.[name] |> update
-        else avgs.Add(name, Average.create 24 |> update)
-    )
-
-/// Filters feeds by a threshold and displays them as notifications
-let processFeeds threshold (avgs : Dictionary<_, _>) =
-    let feeds = Feed.createFromURL "http://www.broadcastify.com/listen/top"
+let update threshold avgs =
     let hour  = DateTime.UtcNow.Hour
+    let feeds =
+        Feed.createFromURL "http://www.broadcastify.com/listen/top"
+        |> Array.map (fun f ->
+            let avg =
+                Map.tryFind f.Name avgs
+                |> Option.defaultArg (Average.create 24)
+                |> Average.update hour 5 f.Listeners
+            (f, avg)
+        )
 
     let isPastAverage f avg =
         float f.Listeners >= float avg.Hourly.[hour] * threshold
 
-    updateAverages hour avgs feeds
-
     feeds
-    |> Array.choose (fun f ->
-        match avgs.TryGetValue f.Name with
-        | (true, avg) -> Some (f, avg)
-        | (false, _)  -> None
-    )
     |> Array.filter (fun (f, avg) -> isPastAverage f avg || Option.isSome f.Info)
     |> Array.map fst
     |> showFeeds
-    
-    avgs
 
-let processLoop threshold (updateTime : TimeSpan) =
-    let rec update avgs =
-        let newAvgs = processFeeds threshold avgs
+    let newAvgs =
+        feeds
+        |> Array.fold (fun m (f, avg) -> Map.add f.Name avg m) avgs
 
-        newAvgs
-        |> Seq.map (fun (KeyValue(n, avg)) -> (n, avg))
-        |> Average.saveHourly
+    Average.saveToFile averagesPath newAvgs
+    newAvgs
 
+let start threshold (updateTime : TimeSpan) =
+    let rec loop avgs =
+        let newAvgs = update threshold avgs
         Thread.Sleep (int updateTime.TotalMilliseconds)
-        update newAvgs
+        loop newAvgs
 
-    let avgs = new Dictionary<string, Average.T>()
-
-    Average.loadHourly ()
-    |> Seq.iter (fun (n, avg) ->
-        if avgs.ContainsKey n |> not
-        then avgs.Add(n, Average.createWithHourly avg)
-    )
-
-    update avgs
+    Average.loadFromFile averagesPath
+    |> loop
 
 [<EntryPoint>]
 let main args =
-    let tryParse f input =
-        match f input with
-        | (true, x) -> Some x
-        | (false, _) -> None
-
     let (|Minutes|_|) =
-        tryParse Double.TryParse
+        Convert.tryParse Double.TryParse
         >> Option.map TimeSpan.FromMinutes
 
     let (|Threshold|_|) =
-        tryParse Double.TryParse
+        Convert.tryParse Double.TryParse
         >> Option.map (fun x -> x / 100. + 1.)
 
     match args with
     | [|_; Minutes time|] when time.TotalMinutes < 5. ->
-        Console.WriteLine "Update time must be >= 5 minutes"
+        printfn "Update time must be >= 5 minutes"
     | [|Threshold threshold; Minutes updateTime|] ->
-        processLoop threshold updateTime
+        start threshold updateTime
     | _ ->
-        Console.WriteLine "Usage: <percentage jump to display feed> <update time in minutes>"
-        processLoop 30. (TimeSpan.FromMinutes 6.)
+        printfn "Usage: <percentage jump to display feed> <update time in minutes>"
+        start 30. (TimeSpan.FromMinutes 6.)
     0

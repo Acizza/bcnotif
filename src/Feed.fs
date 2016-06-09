@@ -1,10 +1,7 @@
 module Feed
 
-open System
 open System.Net
 open System.Text.RegularExpressions
-open System.IO
-open FSharp.Data
 
 type Feed = {
     Name      : string
@@ -12,8 +9,7 @@ type Feed = {
     Info      : string option
 }
 
-/// Parses all feeds from HTML
-let createFromString str =
+let createFromHTML str =
     let create (m:Match) =
         let value (i:int) = m.Groups.[i].Value
         {
@@ -35,7 +31,7 @@ let createFromURL (url : string) =
     c.DownloadString(url)
         .Trim()
         .Replace("\n", " ")
-    |> createFromString
+    |> createFromHTML
 
 let createNotif feed index numFeeds =
     let infoStr =
