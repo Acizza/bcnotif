@@ -6,6 +6,20 @@ open System
 open System.Threading
 open Util
 
+module Threshold =
+    open FSharp.Data
+    open System.IO
+
+    type Thresholds = CsvProvider<Schema = "Feed (string), Threshold (float)", HasHeaders = false>
+
+    let loadFromFile path =
+        match File.Exists path && (FileInfo path).Length > 0L with
+        | true ->
+            Thresholds.Load(uri = path).Rows
+            |> Seq.map (fun row -> (row.Feed, row.Threshold))
+            |> Map.ofSeq
+        | false -> Map.empty
+
 let showFeeds feeds =
     let create i f =
         let idx =
@@ -24,10 +38,13 @@ let showFeeds feeds =
     #endif
     |> Array.iteri create
 
-let averagesPath =
+let localPath path =
     sprintf "%s%s"
         AppDomain.CurrentDomain.BaseDirectory
-        "averages.csv"
+        path
+
+let averagesPath   = localPath "averages.csv"
+let thresholdsPath = localPath "thresholds.csv"
 
 let update threshold avgs =
     let hour  = DateTime.UtcNow.Hour
@@ -41,7 +58,13 @@ let update threshold avgs =
             (f, avg)
         )
 
+    let thresholds = Threshold.loadFromFile thresholdsPath
+
     let isPastAverage f avg =
+        let threshold =
+            thresholds
+            |> Map.tryFind f.Name
+            |> Option.defaultArg threshold
         float f.Listeners >= float avg.Hourly.[hour] * threshold
 
     feeds
