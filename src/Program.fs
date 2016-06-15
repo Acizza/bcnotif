@@ -25,7 +25,7 @@ let showFeeds feeds =
         let idx =
             // Reverse notif. index on Windows to accommodate for its display order
             #if WINDOWS
-            feeds.Length-i
+            Array.length feeds - i
             #else
             i+1
             #endif
