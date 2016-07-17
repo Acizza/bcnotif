@@ -20,10 +20,19 @@ module Threshold =
             |> Map.ofSeq
         | false -> Map.empty
 
+module Path =
+    let getLocal path =
+        sprintf "%s%s"
+            AppDomain.CurrentDomain.BaseDirectory
+            path
+
+    let averages   = getLocal "averages.csv"
+    let thresholds = getLocal "thresholds.csv"
+
 let showFeeds feeds =
     let create i f =
+        // Windows displays notifications in a reversed order
         let idx =
-            // Reverse notif. index on Windows to accommodate for its display order
             #if WINDOWS
             Array.length feeds - i
             #else
@@ -33,18 +42,10 @@ let showFeeds feeds =
         Feed.createNotif f idx (Array.length feeds)
 
     feeds
-    #if WINDOWS // Windows displays notifications in a reversed order
+    #if WINDOWS
     |> Array.rev
     #endif
     |> Array.iteri create
-
-let localPath path =
-    sprintf "%s%s"
-        AppDomain.CurrentDomain.BaseDirectory
-        path
-
-let averagesPath   = localPath "averages.csv"
-let thresholdsPath = localPath "thresholds.csv"
 
 let update threshold avgs =
     let hour  = DateTime.UtcNow.Hour
@@ -58,7 +59,7 @@ let update threshold avgs =
             (f, avg)
         )
 
-    let thresholds = Threshold.loadFromFile thresholdsPath
+    let thresholds = Threshold.loadFromFile Path.thresholds
 
     let isPastAverage f avg =
         let threshold =
@@ -76,7 +77,7 @@ let update threshold avgs =
         feeds
         |> Array.fold (fun m (f, avg) -> Map.add f.Name avg m) avgs
 
-    Average.saveToFile averagesPath newAvgs
+    Average.saveToFile Path.averages newAvgs
     newAvgs
 
 let start threshold (updateTime : TimeSpan) =
@@ -85,7 +86,7 @@ let start threshold (updateTime : TimeSpan) =
         Thread.Sleep (int updateTime.TotalMilliseconds)
         loop newAvgs
 
-    Average.loadFromFile averagesPath
+    Average.loadFromFile Path.averages
     |> loop
 
 [<EntryPoint>]
