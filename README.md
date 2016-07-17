@@ -5,12 +5,23 @@ The purpose of this program is to display feeds from Broadcastify that suddenly 
 # Usage
 
 ```
-./BCInfo.exe <percentage jump to display feed> <update time in minutes>
+USAGE: BCInfo.exe [--help] [--threshold <percentage>] [--updatetime <minutes>] [--sort <ascending|descending>]
+
+OPTIONS:
+
+    --threshold, -p <percentage>
+                          specify the percentage jump required to show a feed
+    --updatetime, -t <minutes>
+                          specify the minutes between updates (must be >= 5)
+    --sort, -s <ascending|descending>
+                          specify the order feeds will be displayed in
+    --help                display this list of options.
 ```
 
-The first argument specifies how sensitive the program will be with sudden jumps in listeners. For example, if you used a percentage of 30%, the program would only display feeds that went from 100 average listeners to 130 listeners by the next update.
+The threshold argument specifies how sensitive the program will be with sudden jumps in listeners.
+For example: if you used a threshold of 30 and there's a feed that averages 200 listeners, the feed will show up in the next update if it jumped to 260 listeners.
 
-If you don't provide any arguments, the program will use 30% as the percentage and 6 minutes as the update time, which should be good enough for most users.
+If you don't provide any arguments, the program will use 30% as the threshold and 6 minutes as the update time, which should be good enough for most users.
 
 You can also specify different percentages for specific feeds by creating a file next to the executable named *thresholds.csv* and putting the feed name and percentage in it separated by a comma.
 Note that if the feed name contains any commas, you'll have to wrap the entire feed name in quotes. Here's an example which contains two feeds:
