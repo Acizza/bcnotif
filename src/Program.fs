@@ -3,32 +3,10 @@ module Main
 open Argu
 open Average
 open Feed
+open FSharp.Configuration
 open System
 open System.Threading
 open Util
-
-module Threshold =
-    open FSharp.Data
-    open System.IO
-
-    type Thresholds = CsvProvider<Schema = "Feed (string), Threshold (float)", HasHeaders = false>
-
-    let loadFromFile path =
-        match File.Exists path && (FileInfo path).Length > 0L with
-        | true ->
-            Thresholds.Load(uri = path).Rows
-            |> Seq.map (fun row -> (row.Feed, row.Threshold))
-            |> Map.ofSeq
-        | false -> Map.empty
-
-module Path =
-    let getLocal path =
-        sprintf "%s%s"
-            AppDomain.CurrentDomain.BaseDirectory
-            path
-
-    let averages   = getLocal "averages.csv"
-    let thresholds = getLocal "thresholds.csv"
 
 module Args =
     type SortOrder =
@@ -47,6 +25,12 @@ module Args =
                     | UpdateTime _ -> "specify the minutes between updates (must be >= 5)"
                     | Sort       _ -> "specify the order feeds will be displayed in"
 
+type Config = YamlConfig<"Config.yaml">
+
+module Path =
+    let averages = Util.localPath "averages.csv"
+    let config   = Util.localPath "Config.yaml"
+
 open Args
 
 let showFeeds sortOrder feeds =
@@ -60,7 +44,21 @@ let showFeeds sortOrder feeds =
     |> sort
     |> Array.iter (fun (i, f) -> Feed.createNotif f (i+1) (Array.length feeds))
 
-let update threshold sortOrder avgs =
+let filterFeeds (config : Config) hour threshold feeds =
+    let isPastAverage f avg =
+        let threshold =
+            config.Thresholds
+            |> Seq.tryFind (fun t -> t.Name = f.Name)
+            |> Option.map  (fun t -> float t.Threshold / 100. + 1.)
+            |> Option.defaultArg threshold
+        float f.Listeners >= float avg.Hourly.[hour] * threshold
+
+    let isBlacklisted feed = Seq.contains feed.Name config.Blacklist
+    let isValid (f, avg)   = (isBlacklisted >> not) f && (isPastAverage f avg || Option.isSome f.Info)
+
+    feeds |> Array.filter isValid
+
+let update threshold sortOrder avgs (config : Config) =
     let hour  = DateTime.UtcNow.Hour
     let feeds =
         Feed.createFromURL "http://www.broadcastify.com/listen/top"
@@ -71,18 +69,9 @@ let update threshold sortOrder avgs =
                 |> Average.update hour 5 f.Listeners
             (f, avg)
         )
-        
-    let thresholds = Threshold.loadFromFile Path.thresholds
-
-    let isPastAverage f avg =
-        let threshold =
-            thresholds
-            |> Map.tryFind f.Name
-            |> Option.defaultArg threshold
-        float f.Listeners >= float avg.Hourly.[hour] * threshold
 
     feeds
-    |> Array.filter (fun (f, avg) -> isPastAverage f avg || Option.isSome f.Info)
+    |> filterFeeds config hour threshold
     |> Array.map fst
     |> showFeeds sortOrder
 
@@ -94,8 +83,11 @@ let update threshold sortOrder avgs =
     newAvgs
 
 let start threshold (updateTime : TimeSpan) sortOrder =
+    let config = Config()
+
     let rec loop avgs =
-        let newAvgs = update threshold sortOrder avgs
+        config.Load Path.config
+        let newAvgs = update threshold sortOrder avgs config
         Thread.Sleep (int updateTime.TotalMilliseconds)
         loop newAvgs
 

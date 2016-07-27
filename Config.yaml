@@ -1,0 +1,7 @@
+---
+Thresholds:
+    - Name: ""
+      Threshold: 0
+
+Blacklist:
+    - ""
