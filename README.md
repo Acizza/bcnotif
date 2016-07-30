@@ -23,11 +23,44 @@ For example: if you used a threshold of 30 and there's a feed that averages 200 
 
 If you don't provide any arguments, the program will use 30% as the threshold and 6 minutes as the update time, which should be good enough for most users.
 
-You can also specify different percentages for specific feeds by creating a file next to the executable named *thresholds.csv* and putting the feed name and percentage in it separated by a comma.
-Note that if the feed name contains any commas, you'll have to wrap the entire feed name in quotes. Here's an example which contains two feeds:
+# Configuration
+
+You can blacklist specific feeds or give them specific thresholds by modifying the *Config.yaml* file.
+For example, to have the *Chicago Police* feed display if it jumps by 20% and the *Sacramento County Sheriff and Sacramento City Police*
+feed display if it jumps by 10%, you could modify your config file to look like this:
 ```
-"Folsom, Citrus Heights, Elk Grove, and West Sacramento Police",15
-Sacramento County Sheriff and Sacramento City Police,20
+---
+Thresholds:
+    - Name: Chicago Police
+      Threshold: 20
+
+    - Name: Sacramento County Sheriff and Sacramento City Police
+      Threshold: 10
 ```
 
-Note that the *thresholds.csv* file is loaded with every update so you can observe changes quickly.
+If you'd like to blacklist a feed from ever displaying, you can modify your *Config.yaml* file to look like this:
+```
+---
+Blacklist:
+    - Feed Name One
+    - Feed Name Two
+    - Feed Name Three
+```
+
+You can also combine the custom thresholds and blacklist together:
+```
+---
+Thresholds:
+    - Name: Chicago Police
+      Threshold: 20
+
+    - Name: Sacramento County Sheriff and Sacramento City Police
+      Threshold: 10
+
+Blacklist:
+    - Feed Name One
+    - Feed Name Two
+    - Feed Name Three
+```
+
+Also note that the *Config.yaml* file is reloaded with every update, so changes will take effect immediately.
