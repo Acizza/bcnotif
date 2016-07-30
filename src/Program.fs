@@ -39,8 +39,16 @@ let start threshold (updateTime : TimeSpan) sortOrder =
     let config = Config()
 
     let rec loop avgs =
-        config.Load Path.config
-        let newAvgs = update threshold sortOrder avgs config
+        let newAvgs =
+            try
+                config.Load Path.config
+                update threshold sortOrder avgs config
+            with
+            | ex ->
+                eprintfn "%A" ex
+                ex.ToString() |> Notification.createError
+                avgs
+
         Thread.Sleep (int updateTime.TotalMilliseconds)
         loop newAvgs
 
