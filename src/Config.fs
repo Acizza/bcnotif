@@ -36,4 +36,3 @@ module Args =
         results.GetResult(value, defaultValue = def)
 
 type Config = YamlConfig<"Config.yaml">
-let config  = Config()
