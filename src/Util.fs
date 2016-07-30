@@ -3,6 +3,11 @@ module Util
 open System
 open System.IO
 
+// TODO: Remove when F# 4.1 is available on Windows
+type Result<'a, 'b> =
+    | Success of 'a
+    | Failure of 'b
+
 module Convert =
     let tryParse f input =
         match f input with

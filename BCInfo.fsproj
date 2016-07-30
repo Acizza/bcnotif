@@ -68,7 +68,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="src/Util.fs" />
-    <Compile Include="src/Average.fs" />
+    <Compile Include="src/Config.fs" />
     <Compile Include="src/Notification.fs" />
     <Compile Include="src/Feed.fs" />
     <Compile Include="src/Program.fs" />
