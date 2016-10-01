@@ -5,3 +5,9 @@ Thresholds:
 
 Blacklist:
     - ""
+
+Info Whitelist:
+    - ""
+
+Info Blacklist:
+    - ""

@@ -125,7 +125,7 @@ let displayAll sortOrder feeds =
 
 open Average
 
-/// Filter out feeds that belong on the blacklist or don't spike in listeners / have a status
+/// Filter out feeds that belong on any blacklists or don't spike in listeners / have a status
 let filter (config : Config.Config) hour threshold feeds =
     let isPastAverage f =
         let threshold =
@@ -134,8 +134,30 @@ let filter (config : Config.Config) hour threshold feeds =
             |> Option.map  (fun t -> float t.Threshold / 100. + 1.)
             |> Option.defaultArg threshold
         float f.Listeners >= float f.AvgListeners.Hourly.[hour] * threshold
+    
+    let isBlacklisted feed =
+        let isInfoBlacklisted () =
+            match feed.Info with
+            | Some info ->
+                let infoWords =
+                    info.Trim()
+                        .ToLower()
+                        .Split ' '
 
-    let isBlacklisted feed = Seq.contains feed.Name config.Blacklist
+                let containsWord =
+                    Seq.exists (fun (word : string) ->
+                        Array.contains (word.ToLower()) infoWords
+                    )
+
+                // Eliminate empty entries to reduce any "false positives" when length checking
+                let whitelist = config.``Info Whitelist`` |> Seq.filter ((<>) "")
+
+                if Seq.length whitelist > 0
+                then whitelist |> containsWord |> not // Blacklist anything not on the whitelist
+                else config.``Info Blacklist`` |> containsWord
+            | None -> false
+
+        Seq.contains feed.Name config.Blacklist || isInfoBlacklisted ()
+
     let isValid f = (isBlacklisted >> not) f && (isPastAverage f || Option.isSome f.Info)
-
     feeds |> Array.filter isValid
