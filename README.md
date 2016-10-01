@@ -47,7 +47,20 @@ Blacklist:
     - Feed Name Three
 ```
 
-You can also combine the custom thresholds and blacklist together:
+You can also blacklist and whitelist certain words for info messages that feeds will typical have when an event is taking place.
+For example, if you only want to see feeds with info that contain the word "shooter", you can modify your config like this:
+```
+Info Whitelist:
+    - shooter
+```
+
+If you don't wish to see feeds with info that contain the word "fire", you can modify your config like so:
+```
+Info Blacklist:
+    - fire
+```
+
+A typical config file may look something like this:
 ```
 ---
 Thresholds:
@@ -61,6 +74,16 @@ Blacklist:
     - Feed Name One
     - Feed Name Two
     - Feed Name Three
+
+Info Whitelist:
+    - Word One
+    - Word Two
+    - Word Three
+
+Info Blacklist:
+    - Word One
+    - Word Two
+    - Word Three
 ```
 
-Also note that the *Config.yaml* file is reloaded with every update, so changes will take effect immediately.
+Also note that the config file is reloaded with every update, so changes will take effect immediately.
