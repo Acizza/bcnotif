@@ -1,6 +1,7 @@
 module Feed
 
 open Config.Args
+open System
 open System.Net
 open System.Text.RegularExpressions
 open Util
@@ -20,7 +21,7 @@ module Average =
         Hourly = Array.zeroCreate hourlySize
     }
 
-    let createWithHourly source = {
+    let createWithHourlyData source = {
         Moving = []
         Hourly = source
     }
@@ -40,10 +41,10 @@ module Average =
 
         avgArr
         |> Array.filter (fun (_, a) -> a.Hourly.Length = head.Hourly.Length)
-        |> Array.map (fun (name : string, avg) ->
+        |> Array.map (fun (feedID, avg) ->
             let hourly = avg.Hourly |> Array.map string
-            sprintf "\"%s\",%s"
-                <| name.Trim()
+            sprintf "%d,%s"
+                <| feedID
                 <| String.concat "," hourly
         )
         |> fun str -> File.WriteAllLines(path, str)
@@ -53,12 +54,14 @@ module Average =
         | 0L -> Map.empty
         | _  ->
             CsvFile.Load(path).Rows
-            |> Seq.fold (fun m x ->
+            |> Seq.fold (fun map row ->
                 let avg =
-                    x.Columns.[1..]
+                    row.Columns.[1..]
                     |> Array.map int
-                    |> createWithHourly
-                Map.add x.[0] avg m
+                    |> createWithHourlyData
+
+                let feedID = int row.[0]
+                Map.add feedID avg map
             ) Map.empty
 
 type Feed = {

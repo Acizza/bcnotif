@@ -18,7 +18,8 @@ let update threshold sortOrder avgs (config : Config) =
         Feed.createFromURL "http://www.broadcastify.com/listen/top"
         |> Array.map (fun f ->
             let avg =
-                Map.tryFind f.Name avgs
+                avgs
+                |> Map.tryFind f.Id
                 |> Option.defaultArg f.AvgListeners
                 |> Average.update hour 5 f.Listeners
             {f with AvgListeners = avg}
@@ -29,8 +30,9 @@ let update threshold sortOrder avgs (config : Config) =
     |> Feed.displayAll sortOrder
 
     let newAvgs =
-        feeds
-        |> Array.fold (fun m f -> Map.add f.Name f.AvgListeners m) avgs
+        Array.fold (fun m f -> Map.add f.Id f.AvgListeners m)
+            avgs
+            feeds
 
     Average.saveToFile Path.averages newAvgs
     newAvgs
