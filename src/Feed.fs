@@ -1,7 +1,6 @@
 module Feed
 
 open Config.Args
-open System
 open System.Net
 open System.Text.RegularExpressions
 open Util
@@ -57,11 +56,13 @@ module Average =
             |> Seq.fold (fun map row ->
                 let avg =
                     row.Columns.[1..]
-                    |> Array.map int
+                    |> Array.map (Convert.tryParseInt >> Option.defaultArg 0)
                     |> createWithHourlyData
 
-                let feedID = int row.[0]
-                Map.add feedID avg map
+                let feedID = Convert.tryParseInt row.[0]
+                match feedID with
+                | Some id -> Map.add id avg map
+                | None    -> map
             ) Map.empty
 
 type Feed = {

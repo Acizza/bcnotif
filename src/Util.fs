@@ -14,6 +14,8 @@ module Convert =
         | (true, x)  -> Some x
         | (false, _) -> None
 
+    let tryParseInt = tryParse Int32.TryParse
+
 module Option =
     /// Flipped version of defaultArg
     let defaultArg x y = defaultArg y x
