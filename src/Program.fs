@@ -12,6 +12,11 @@ module Path =
     let averages = Util.localPath "averages.csv"
     let config   = Util.localPath "Config.yaml"
 
+module Error =
+    let display (ex : Exception) =
+        eprintfn "%A" ex
+        Notification.createError ex.Message
+
 let update threshold sortOrder avgs (config : Config) =
     let hour  = DateTime.UtcNow.Hour
     let feeds =
@@ -47,8 +52,7 @@ let start threshold (updateTime : TimeSpan) sortOrder =
                 update threshold sortOrder avgs config
             with
             | ex ->
-                eprintfn "%A" ex
-                ex.ToString() |> Notification.createError
+                Error.display ex
                 avgs
 
         Thread.Sleep (int updateTime.TotalMilliseconds)
@@ -69,7 +73,11 @@ let main args =
 
         match updateTime with
         | t when t < 5. -> parser.PrintUsage() |> eprintfn "%s"
-        | Minutes time  -> start threshold time sortOrder
+        | Minutes time  ->
+            try
+                start threshold time sortOrder
+            with
+            | ex -> Error.display ex
     | Failure msg -> eprintfn "%s" msg
 
     0
