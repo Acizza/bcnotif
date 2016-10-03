@@ -54,11 +54,13 @@ Info Whitelist:
     - shooter
 ```
 
-If you don't wish to see feeds with info that contain the word "fire", you can modify your config like so:
+If you don't wish to see feeds with info that contain the word "structure fire", you can modify your config like so:
 ```
 Info Blacklist:
-    - fire
+    - "structure fire"
 ```
+
+Keep in mind that the terms you use are checked to see if they appear **anywhere** in the feed's info, so if you would like to blacklist / whitelist words such as "mva", it may be a good idea to surround it in spaces (ex. " mva ") so other words can't accidently trigger it.
 
 A typical config file may look something like this:
 ```
