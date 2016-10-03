@@ -139,22 +139,17 @@ let filter (config : Config.Config) hour threshold feeds =
         let isInfoBlacklisted () =
             match feed.Info with
             | Some info ->
-                let infoWords =
-                    info.Trim()
-                        .ToLower()
-                        .Split ' '
-
-                let containsWord =
+                let containsAnyWord =
                     Seq.exists (fun (word : string) ->
-                        Array.contains (word.ToLower()) infoWords
+                        info.ToLower().Contains (word.ToLower())
                     )
 
                 // Eliminate empty entries to reduce any "false positives" when length checking
                 let whitelist = config.``Info Whitelist`` |> Seq.filter ((<>) "")
 
                 if Seq.length whitelist > 0
-                then whitelist |> containsWord |> not // Blacklist anything not on the whitelist
-                else config.``Info Blacklist`` |> containsWord
+                then whitelist |> containsAnyWord |> not // Blacklist anything not on the whitelist
+                else config.``Info Blacklist`` |> containsAnyWord
             | None -> false
 
         Seq.contains feed.Name config.Blacklist || isInfoBlacklisted ()
