@@ -8,7 +8,6 @@ open Util
 module Average =
     open FSharp.Data
     open System.IO
-    open Util
 
     type T = {
         Moving : int list
@@ -148,12 +147,13 @@ let filter (config : Config.Config) hour threshold feeds =
                         info.ToLower().Contains (word.ToLower())
                     )
 
-                // Eliminate empty entries to reduce any "false positives" when length checking
+                // Eliminate empty entries to avoid false positives
                 let whitelist = config.``Info Whitelist`` |> Seq.filter ((<>) "")
+                let blacklist = config.``Info Blacklist`` |> Seq.filter ((<>) "")
 
                 if Seq.length whitelist > 0
                 then whitelist |> containsAnyWord |> not // Blacklist anything not on the whitelist
-                else config.``Info Blacklist`` |> containsAnyWord
+                else blacklist |> containsAnyWord
             | None -> false
 
         Seq.contains feed.Name config.Blacklist || isInfoBlacklisted ()

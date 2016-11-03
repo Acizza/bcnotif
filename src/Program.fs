@@ -3,7 +3,6 @@ module Main
 open Config
 open Config.Args
 open Feed
-open Feed.Average
 open System
 open System.Threading
 open Util
