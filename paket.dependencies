@@ -1,5 +1,0 @@
-source https://www.nuget.org/api/v2
-
-nuget FSharp.Configuration ~> 0.6
-nuget FSharp.Data ~> 2.3
-nuget Argu ~> 3.3

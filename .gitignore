@@ -1,5 +1,1 @@
-bin/
-obj/
-packages/
-
-.paket/paket.exe
+target
