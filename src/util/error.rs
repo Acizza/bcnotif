@@ -43,13 +43,16 @@ macro_rules! check_err_p {
 
 #[macro_export]
 macro_rules! check_err_c {
-    ($x:expr) => {{
+    ($x:expr, $additional_code:block) => {{
         match $x {
             Ok(v) => v,
             Err(err) => {
                 report_error!(println, err);
+                $additional_code
                 continue
             }
         }
     }};
+
+    ($x:expr) => (check_err_c!($x, {}));
 }

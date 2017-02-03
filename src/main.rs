@@ -85,7 +85,10 @@ fn main() {
             println!("updating");
         }
 
-        let config = check_err_c!(config::load_from_file(&config_path));
+        let config = check_err_c!(config::load_from_file(&config_path), {
+            // Sleep on an error to prevent a potential infinite loop
+            thread::sleep(Duration::from_secs(6 * 60));
+        });
 
         check_err!(perform_update(&config, &mut listeners));
         check_err!(listeners::save_averages(&averages_path, &listeners));
