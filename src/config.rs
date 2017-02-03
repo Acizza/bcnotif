@@ -110,7 +110,7 @@ create_config_arr!("Feed Percentages", FeedPercentage,
 );
 
 create_config_section!("Global", Global,
-	spike:                   f32        => "Spike"                                => 0.20,
+	spike:                   f32        => "Spike"                                => 0.25,
 	unskewed_reset_pcnt:     f32        => "Unskewed Reset Percentage"            => [0.0, 0.15],
 	unskewed_adjust_pcnt:    f32        => "Unskewed Adjust Percentage"           => [0.0, 0.01],
 	low_listener_increase:   f32        => "Low Listener Increase Percentage"     => [0.0, 0.005],
