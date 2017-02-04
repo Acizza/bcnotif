@@ -7,7 +7,7 @@ use self::yaml_rust::{YamlLoader, Yaml};
 
 // I may have gotten a little carried away with these macros..
 
-// Due to limitations of the macro system and the YAML library, we must use a generic solution
+// Due to limitations of the macro system, we must use a generic solution
 // to retrieve values dynamically.
 fn yaml_to_string(yaml: &Yaml) -> Option<String> {
     use self::yaml_rust::Yaml::*;
@@ -48,7 +48,7 @@ macro_rules! gen_value {
 }
 
 macro_rules! create_config_section {
-    ($yaml_name:expr, $name:ident, $($field:ident: $field_t:ty => $disp_name:expr => $default:tt,)+) => {
+    ($name:ident, $($field:ident: $field_t:ty => $disp_name:expr => $default:tt,)+) => {
         #[derive(Debug)]
         pub struct $name {
             $(pub $field: $field_t,)+
@@ -56,10 +56,8 @@ macro_rules! create_config_section {
 
         impl $name {
             pub fn new(doc: &Yaml) -> $name {
-                let parent = &doc[$yaml_name];
-
                 $name {
-                    $($field: gen_value!(parent, $disp_name, $default),)+
+                    $($field: gen_value!(doc, $disp_name, $default),)+
                 }
             }
         }
@@ -76,7 +74,7 @@ macro_rules! try_opt {
 }
 
 macro_rules! create_config_arr {
-    ($yaml_name:expr, $name:ident, $($field:ident: $field_type:ty => $disp_name:expr,)+) => {
+    ($name:ident, $($field:ident: $field_type:ty => $disp_name:expr,)+) => {
         #[derive(Debug)]
         pub struct $name {
             $(pub $field: $field_type,)+
@@ -84,9 +82,7 @@ macro_rules! create_config_arr {
 
         impl $name {
             pub fn parse(doc: &Yaml) -> Vec<$name> {
-                let parent = &doc[$yaml_name];
-
-                parent.as_vec()
+                doc.as_vec()
                     .unwrap_or(&Vec::new())
                     .iter()
                     .filter_map(|field| {
@@ -104,15 +100,55 @@ macro_rules! create_config_arr {
     };
 }
 
-create_config_arr!("Feed Percentages", FeedPercentage,
+macro_rules! create_config_enum {
+    ($name:ident, $($field:ident($field_t:ty) => $disp_name:expr,)+) => {
+        #[derive(Debug)]
+        pub enum $name {
+            $($field($field_t),)+
+        }
+
+        impl $name {
+            pub fn parse(doc: &Yaml) -> Option<Vec<$name>> {
+                let elements   = try_opt!(doc.as_vec());
+                let mut values = Vec::new();
+
+                for element in elements {
+                    $(
+                    let elem = &element[$disp_name];
+
+                    if !elem.is_badvalue() {
+                        let value = yaml_to_string(elem)
+                                        .and_then(|s| s.parse().ok());
+
+                        match value {
+                            Some(v) => {
+                                values.push($name::$field(v));
+                                continue
+                            },
+                            None => (),
+                        }
+                    }
+                    )+
+                }
+
+                Some(values)
+            }
+        }
+    };
+}
+
+create_config_enum!(Blacklist,
+    Name(String) => "Name",
+    Id(i32)      => "Id",
+);
+
+create_config_arr!(FeedPercentage,
     name:  String => "Name",
     spike: f32    => "Spike",
 );
 
-create_config_section!("Global", Global,
-	spike:                   f32        => "Spike"                                => 0.25,
-	unskewed_reset_pcnt:     f32        => "Unskewed Reset Percentage"            => [0.0, 0.15],
-	unskewed_adjust_pcnt:    f32        => "Unskewed Adjust Percentage"           => [0.0, 0.01],
+create_config_section!(Global,
+	spike:                   f32        => "Spike Percentage"                     => 0.25,
 	low_listener_increase:   f32        => "Low Listener Increase Percentage"     => [0.0, 0.005],
 	high_listener_dec:       f32        => "High Listener Decrease Percentage"    => [0.0, 0.02],
 	high_listener_dec_every: f32        => "High Listener Decrease Per Listeners" => [1.0, 100.0],
@@ -121,11 +157,18 @@ create_config_section!("Global", Global,
 	state_feeds_id:          Option<u8> => "State Feeds ID"                       => None,
 );
 
+create_config_section!(UnskewedAverage,
+    reset_pcnt:      f32 => "Reset To Average Percentage"  => [0.0, 0.15],
+    adjust_pcnt:     f32 => "Adjust to Average Percentage" => [0.0, 0.01],
+    spikes_required: u8  => "Listener Spikes Required"     => 1,
+);
+
 #[derive(Debug)]
 pub struct Config {
     pub global:           Global,
+    pub unskewed_avg:     UnskewedAverage,
     pub feed_percentages: Vec<FeedPercentage>,
-    pub blacklist:        Vec<String>,
+    pub blacklist:        Vec<Blacklist>,
 }
 
 pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
@@ -133,8 +176,9 @@ pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
     let doc = &doc[0]; // We don't care about multiple documents
 
     Ok(Config {
-        global:           Global::new(&doc),
-        feed_percentages: FeedPercentage::parse(&doc),
-        blacklist:        Vec::new(),
+        global:           Global::new(&doc["Global"]),
+        unskewed_avg:     UnskewedAverage::new(&doc["Unskewed Average"]),
+        feed_percentages: FeedPercentage::parse(&doc["Feed Percentages"]),
+        blacklist:        Blacklist::parse(&doc["Blacklist"]).unwrap_or(Vec::new()),
     })
 }

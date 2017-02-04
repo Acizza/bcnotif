@@ -80,21 +80,22 @@ impl ListenerData {
         match self.unskewed_avg {
             Some(unskewed) => {
                 // Remove the unskewed average when the current average is close
-                if self.average.current - unskewed < unskewed * config.global.unskewed_reset_pcnt {
+                if self.average.current - unskewed < unskewed * config.unskewed_avg.reset_pcnt {
                     self.unskewed_avg = None;
                     self.hourly[hour] = self.average.current;
                 } else {
                     // Slowly adjust the unskewed average to adjust to any natural listener increases
                     let new_val = lerp(unskewed,
                                         self.average.current,
-                                        config.global.unskewed_adjust_pcnt);
+                                        config.unskewed_avg.adjust_pcnt);
 
                     self.unskewed_avg = Some(new_val);
                     self.hourly[hour] = new_val;
                 }
             },
             None => {
-                if has_spiked && self.spike_count > 1 && self.average.last > 0. {
+                if has_spiked && self.spike_count > config.unskewed_avg.spikes_required
+                    && self.average.last > 0. {
                     // Use the current average instead of the last average to allow
                     // the saved average to catch up to natural listener changes
                     self.unskewed_avg = Some(self.average.current);
