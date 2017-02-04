@@ -15,7 +15,7 @@ use config::Config;
 use self::chrono::{UTC, Timelike};
 
 fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), Box<Error>> {
-    let feeds = feed::get_latest(config.global.state_feeds_id)?;
+    let feeds = feed::get_latest(&config)?;
     let hour  = UTC::now().hour() as usize;
 
     let mut display_feeds = Vec::new();

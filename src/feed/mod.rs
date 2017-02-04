@@ -6,6 +6,7 @@ extern crate regex;
 
 use std::error::Error;
 use std::io::Read;
+use config::{Config, Blacklist};
 use self::hyper::client::Client;
 use self::regex::Regex;
 
@@ -76,13 +77,32 @@ fn download_feed_data(client: &Client, source: FeedSource) -> Result<String, Box
     Ok(body)
 }
 
-pub fn get_latest(state_feed: Option<u8>) -> Result<Vec<Feed>, Box<Error>> {
+fn filter(config: &Config, feeds: &mut Vec<Feed>) {
+    use self::Blacklist::*;
+
+    for entry in &config.blacklist {
+        let position = match *entry {
+            Name(ref name) => feeds.iter().position(|ref feed| &feed.name == name),
+            Id(id)         => feeds.iter().position(|ref feed| feed.id == id),
+        };
+
+        match position {
+            Some(p) => {
+                feeds.remove(p);
+                ()
+            },
+            None => (),
+        }
+    }
+}
+
+pub fn get_latest(config: &Config) -> Result<Vec<Feed>, Box<Error>> {
     use self::FeedSource::*;
     
     let client = Client::new();
     let mut feeds = parse(&download_feed_data(&client, Top)?, Top)?;
 
-    if let Some(id) = state_feed {
+    if let Some(id) = config.global.state_feeds_id {
         feeds.extend(parse(&download_feed_data(&client, State(id))?, State(id))?);
         
         // Remove any state feeds that show up in the top 50 list
@@ -90,5 +110,6 @@ pub fn get_latest(state_feed: Option<u8>) -> Result<Vec<Feed>, Box<Error>> {
         feeds.dedup();
     }
 
+    filter(&config, &mut feeds);
     Ok(feeds)
 }
