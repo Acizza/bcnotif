@@ -126,7 +126,7 @@ impl ListenerData {
             spike_pcnt - (self.get_average_delta(listeners) / per_pcnt * pcnt).min(spike_pcnt - 0.01)
         };
         
-        if cfg!(debug) {
+        if cfg!(feature = "show-feed-info") {
             print!(" THR: {}", threshold);
         }
         

@@ -25,7 +25,7 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), 
             continue
         }
 
-        if cfg!(debug) {
+        if cfg!(feature = "show-feed-info") {
             print!("{:?}\n^", feed);
         }
 
@@ -43,7 +43,7 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), 
             display_feeds.push((feed, delta));
         }
 
-        if cfg!(debug) {
+        if cfg!(feature = "show-feed-info") {
             print!(" {:?} UNS: {:?}",
                 listener_data.average,
                 listener_data.unskewed_avg);
@@ -81,7 +81,7 @@ fn main() {
     );
 
     loop {
-        if cfg!(debug) {
+        if cfg!(feature = "show-feed-info") {
             println!("updating");
         }
 

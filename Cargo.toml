@@ -3,6 +3,9 @@ name = "bcnotif"
 version = "0.9.0"
 authors = ["Acizza <jonathanmce@gmail.com>"]
 
+[features]
+show-feed-info = []
+
 [dependencies]
 hyper       = "0.10.*"
 regex       = "0.2.*"
