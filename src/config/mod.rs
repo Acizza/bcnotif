@@ -7,7 +7,7 @@ use self::yaml_rust::{YamlLoader, Yaml};
 
 #[macro_use] mod macros;
 
-create_config_enum!(Blacklist,
+create_config_enum!(FeedIdent,
     Name(String) => "Name",
     Id(i32)      => "Id",
 );
@@ -38,7 +38,7 @@ pub struct Config {
     pub global:           Global,
     pub unskewed_avg:     UnskewedAverage,
     pub feed_percentages: Vec<FeedPercentage>,
-    pub blacklist:        Vec<Blacklist>,
+    pub blacklist:        Vec<FeedIdent>,
 }
 
 pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
@@ -49,6 +49,6 @@ pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
         global:           Global::new(&doc["Global"]),
         unskewed_avg:     UnskewedAverage::new(&doc["Unskewed Average"]),
         feed_percentages: FeedPercentage::parse(&doc["Feed Percentages"]),
-        blacklist:        Blacklist::parse(&doc["Blacklist"]).unwrap_or(Vec::new()),
+        blacklist:        FeedIdent::parse(&doc["Blacklist"]).unwrap_or(Vec::new()),
     })
 }

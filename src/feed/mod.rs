@@ -6,7 +6,7 @@ extern crate regex;
 
 use std::error::Error;
 use std::io::Read;
-use config::{Config, Blacklist};
+use config::{Config, FeedIdent};
 use self::hyper::client::Client;
 use self::regex::Regex;
 
@@ -78,7 +78,7 @@ fn download_feed_data(client: &Client, source: FeedSource) -> Result<String, Box
 }
 
 fn filter(config: &Config, feeds: &mut Vec<Feed>) {
-    use self::Blacklist::*;
+    use self::FeedIdent::*;
 
     for entry in &config.blacklist {
         let position = match *entry {
