@@ -36,7 +36,8 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), 
             .entry(feed.id)
             .or_insert(ListenerData::new(listeners, [0.; 24]));
 
-        let has_spiked = listener_data.step(&config, hour, listeners);
+        let has_spiked = listener_data.has_spiked(&config, &feed);
+        listener_data.update(&config, hour, listeners, has_spiked);
 
         if has_spiked || feed.alert.is_some() {
             let delta = listener_data.get_average_delta(listeners) as i32;

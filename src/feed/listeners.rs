@@ -4,6 +4,7 @@ extern crate chrono;
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
 use config::Config;
+use feed::Feed;
 use util::lerp;
 use self::chrono::{UTC, Timelike};
 
@@ -61,16 +62,12 @@ impl ListenerData {
         }
     }
 
-    pub fn step(&mut self, config: &Config, hour: usize, listeners: f32) -> bool {
-        let has_spiked = self.has_spiked(&config, listeners);
-
+    pub fn update(&mut self, config: &Config, hour: usize, listeners: f32, has_spiked: bool) {
         self.average.update(listeners);
         self.update_hourly(&config, hour, has_spiked);
-
-        has_spiked
     }
 
-    pub fn update_hourly(&mut self, config: &Config, hour: usize, has_spiked: bool) {
+    fn update_hourly(&mut self, config: &Config, hour: usize, has_spiked: bool) {
         self.spike_count = if has_spiked {
             self.spike_count + 1
         } else {
@@ -106,12 +103,18 @@ impl ListenerData {
         }
     }
 
-    pub fn has_spiked(&self, config: &Config, listeners: f32) -> bool {
+    pub fn has_spiked(&self, config: &Config, feed: &Feed) -> bool {
         if self.average.current == 0. {
             return false
         }
 
-        let spike_pcnt = config.global.spike;
+        let spike_pcnt = config.feed_percentages
+                            .iter()
+                            .find(|pcnt| pcnt.name == feed.name)
+                            .map(|pcnt| pcnt.spike)
+                            .unwrap_or(config.global.spike);
+
+        let listeners = feed.listeners as f32;
 
         // If a feed has a low number of listeners, make the threshold higher to
         // make the calculation less sensitive to very small listener jumps
