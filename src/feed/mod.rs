@@ -80,6 +80,19 @@ fn download_feed_data(client: &Client, source: FeedSource) -> Result<String, Box
 fn filter(config: &Config, feeds: &mut Vec<Feed>) {
     use self::FeedIdent::*;
 
+    if config.whitelist.len() > 0 {
+        feeds.retain(|ref feed| {
+            config.whitelist
+                .iter()
+                .any(|entry| {
+                    match *entry {
+                        Name(ref name) => &feed.name == name,
+                        Id(id)         => feed.id == id,
+                    }
+                })
+        });
+    }
+
     for entry in &config.blacklist {
         let position = match *entry {
             Name(ref name) => feeds.iter().position(|ref feed| &feed.name == name),

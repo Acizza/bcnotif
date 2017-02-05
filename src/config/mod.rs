@@ -39,6 +39,7 @@ pub struct Config {
     pub unskewed_avg:     UnskewedAverage,
     pub feed_percentages: Vec<FeedPercentage>,
     pub blacklist:        Vec<FeedIdent>,
+    pub whitelist:        Vec<FeedIdent>,
 }
 
 pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
@@ -50,5 +51,6 @@ pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
         unskewed_avg:     UnskewedAverage::new(&doc["Unskewed Average"]),
         feed_percentages: FeedPercentage::parse(&doc["Feed Percentages"]),
         blacklist:        FeedIdent::parse(&doc["Blacklist"]).unwrap_or(Vec::new()),
+        whitelist:        FeedIdent::parse(&doc["Whitelist"]).unwrap_or(Vec::new()),
     })
 }
