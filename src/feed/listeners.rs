@@ -108,25 +108,25 @@ impl ListenerData {
             return false
         }
 
-        let spike_pcnt = config.feed_percentages
+        let jump_pcnt = config.feed_settings
                             .iter()
-                            .find(|pcnt| pcnt.name == feed.name)
-                            .map(|pcnt| pcnt.spike)
-                            .unwrap_or(config.global.spike);
+                            .find(|setting| setting.id == feed.id)
+                            .map(|setting| setting.jump)
+                            .unwrap_or(config.spike.jump);
 
         let listeners = feed.listeners as f32;
 
         // If a feed has a low number of listeners, make the threshold higher to
         // make the calculation less sensitive to very small listener jumps
         let threshold = if listeners < 50. {
-            spike_pcnt + (50. - listeners) * config.global.low_listener_increase
+            jump_pcnt + (50. - listeners) * config.spike.low_listener_increase
         } else {
             // Otherwise, decrease the threshold by a factor of how fast the feed's listeners are rising
             // to make it easier for the feed to show up in an update
-            let pcnt     = config.global.high_listener_dec;
-            let per_pcnt = config.global.high_listener_dec_every;
+            let pcnt     = config.spike.high_listener_dec;
+            let per_pcnt = config.spike.high_listener_dec_every;
 
-            spike_pcnt - (self.get_average_delta(listeners) / per_pcnt * pcnt).min(spike_pcnt - 0.01)
+            jump_pcnt - (self.get_average_delta(listeners) / per_pcnt * pcnt).min(jump_pcnt - 0.01)
         };
         
         if cfg!(feature = "show-feed-info") {
@@ -146,7 +146,7 @@ impl ListenerData {
     }
 }
 
-pub type AverageMap = HashMap<i32, ListenerData>;
+pub type AverageMap = HashMap<u32, ListenerData>;
 
 pub fn load_averages(path: &Path) -> Result<AverageMap, csv::Error> {
     let mut avgs   = HashMap::new();

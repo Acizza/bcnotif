@@ -17,7 +17,7 @@ enum FeedSource {
 
 #[derive(Debug)]
 pub struct Feed {
-    pub id:        i32,
+    pub id:        u32,
     pub name:      String,
     pub listeners: u32,
     pub alert:     Option<String>,
@@ -87,7 +87,7 @@ fn filter(config: &Config, feeds: &mut Vec<Feed>) {
                 .any(|entry| {
                     match *entry {
                         Name(ref name) => &feed.name == name,
-                        Id(id)         => feed.id == id,
+                        ID(id)         => feed.id == id,
                     }
                 })
         });
@@ -96,7 +96,7 @@ fn filter(config: &Config, feeds: &mut Vec<Feed>) {
     for entry in &config.blacklist {
         let position = match *entry {
             Name(ref name) => feeds.iter().position(|ref feed| &feed.name == name),
-            Id(id)         => feeds.iter().position(|ref feed| feed.id == id),
+            ID(id)         => feeds.iter().position(|ref feed| feed.id == id),
         };
 
         match position {
@@ -115,7 +115,7 @@ pub fn get_latest(config: &Config) -> Result<Vec<Feed>, Box<Error>> {
     let client = Client::new();
     let mut feeds = parse(&download_feed_data(&client, Top)?, Top)?;
 
-    if let Some(id) = config.global.state_feeds_id {
+    if let Some(id) = config.misc.state_feeds_id {
         feeds.extend(parse(&download_feed_data(&client, State(id))?, State(id))?);
         
         // Remove any state feeds that show up in the top 50 list

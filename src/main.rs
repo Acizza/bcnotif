@@ -21,7 +21,7 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), 
     let mut display_feeds = Vec::new();
 
     for feed in feeds {
-        if feed.listeners < config.global.minimum_listeners {
+        if feed.listeners < config.misc.minimum_listeners {
             continue
         }
 
@@ -94,7 +94,7 @@ fn main() {
         check_err!(perform_update(&config, &mut listeners));
         check_err!(listeners::save_averages(&averages_path, &listeners));
 
-        let update_time = (config.global.update_time * 60.) as u64;
+        let update_time = (config.misc.update_time * 60.) as u64;
         thread::sleep(Duration::from_secs(update_time));
     }
 }

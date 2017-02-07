@@ -9,22 +9,19 @@ use self::yaml_rust::{YamlLoader, Yaml};
 
 create_config_enum!(FeedIdent,
     Name(String) => "Name",
-    Id(i32)      => "Id",
+    ID(u32)      => "ID",
 );
 
-create_config_arr!(FeedPercentage,
-    name:  String => "Name",
-    spike: f32    => "Spike",
+create_config_arr!(FeedSetting,
+    id:   u32 => "ID",
+    jump: f32 => "Jump Required",
 );
 
-create_config_section!(Global,
-	spike:                   f32        => "Spike Percentage"                     => 0.25,
-	low_listener_increase:   f32        => "Low Listener Increase Percentage"     => [0.0, 0.005],
-	high_listener_dec:       f32        => "High Listener Decrease Percentage"    => [0.0, 0.02],
-	high_listener_dec_every: f32        => "High Listener Decrease Per Listeners" => [1.0, 100.0],
-	update_time:             f32        => "Update Time"                          => [5.0, 6.0],
-	minimum_listeners:       u32        => "Minimum Listeners"                    => 15,
-	state_feeds_id:          Option<u8> => "State Feeds ID"                       => None,
+create_config_section!(Spike,
+    jump:                    f32 => "Jump Required"                        => 0.25,
+    low_listener_increase:   f32 => "Low Listener Increase"                => [0.0, 0.005],
+    high_listener_dec:       f32 => "High Listener Decrease"               => [0.0, 0.02],
+    high_listener_dec_every: f32 => "High Listener Decrease Per Listeners" => [1.0, 100.0],
 );
 
 create_config_section!(UnskewedAverage,
@@ -33,13 +30,20 @@ create_config_section!(UnskewedAverage,
     spikes_required: u8  => "Listener Spikes Required"     => 1,
 );
 
+create_config_section!(Misc,
+	update_time:       f32        => "Update Time"       => [5.0, 6.0],
+	minimum_listeners: u32        => "Minimum Listeners" => 15,
+	state_feeds_id:    Option<u8> => "State Feeds ID"    => None,
+);
+
 #[derive(Debug)]
 pub struct Config {
-    pub global:           Global,
-    pub unskewed_avg:     UnskewedAverage,
-    pub feed_percentages: Vec<FeedPercentage>,
-    pub blacklist:        Vec<FeedIdent>,
-    pub whitelist:        Vec<FeedIdent>,
+    pub spike:         Spike,
+    pub unskewed_avg:  UnskewedAverage,
+    pub misc:          Misc,
+    pub feed_settings: Vec<FeedSetting>,
+    pub blacklist:     Vec<FeedIdent>,
+    pub whitelist:     Vec<FeedIdent>,
 }
 
 pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
@@ -47,10 +51,11 @@ pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
     let doc = &doc[0]; // We don't care about multiple documents
 
     Ok(Config {
-        global:           Global::new(&doc["Global"]),
-        unskewed_avg:     UnskewedAverage::new(&doc["Unskewed Average"]),
-        feed_percentages: FeedPercentage::parse(&doc["Feed Percentages"]),
-        blacklist:        FeedIdent::parse(&doc["Blacklist"]).unwrap_or(Vec::new()),
-        whitelist:        FeedIdent::parse(&doc["Whitelist"]).unwrap_or(Vec::new()),
+        spike:         Spike::new(&doc["Spike Percentages"]),
+        unskewed_avg:  UnskewedAverage::new(&doc["Unskewed Average"]),
+        misc:          Misc::new(&doc["Misc"]),
+        feed_settings: FeedSetting::parse(&doc["Feed Settings"]),
+        blacklist:     FeedIdent::parse(&doc["Blacklist"]).unwrap_or(Vec::new()),
+        whitelist:     FeedIdent::parse(&doc["Whitelist"]).unwrap_or(Vec::new()),
     })
 }
