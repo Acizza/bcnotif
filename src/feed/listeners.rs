@@ -108,25 +108,25 @@ impl ListenerData {
             return false
         }
 
-        let jump_pcnt = config.feed_settings
-                            .iter()
-                            .find(|setting| setting.id == feed.id)
-                            .map(|setting| setting.jump)
-                            .unwrap_or(config.spike.jump);
+        let spike = config.feed_settings
+                        .iter()
+                        .find(|setting| setting.id == feed.id)
+                        .map(|setting| &setting.spike)
+                        .unwrap_or(&config.spike);
 
         let listeners = feed.listeners as f32;
 
         // If a feed has a low number of listeners, make the threshold higher to
         // make the calculation less sensitive to very small listener jumps
         let threshold = if listeners < 50. {
-            jump_pcnt + (50. - listeners) * config.spike.low_listener_increase
+            spike.jump + (50. - listeners) * config.spike.low_listener_increase
         } else {
             // Otherwise, decrease the threshold by a factor of how fast the feed's listeners are rising
             // to make it easier for the feed to show up in an update
             let pcnt     = config.spike.high_listener_dec;
             let per_pcnt = config.spike.high_listener_dec_every;
 
-            jump_pcnt - (self.get_average_delta(listeners) / per_pcnt * pcnt).min(jump_pcnt - 0.01)
+            spike.jump - (self.get_average_delta(listeners) / per_pcnt * pcnt).min(spike.jump - 0.01)
         };
         
         if cfg!(feature = "show-feed-info") {
