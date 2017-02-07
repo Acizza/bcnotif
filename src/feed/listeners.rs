@@ -119,12 +119,12 @@ impl ListenerData {
         // If a feed has a low number of listeners, make the threshold higher to
         // make the calculation less sensitive to very small listener jumps
         let threshold = if listeners < 50. {
-            spike.jump + (50. - listeners) * config.spike.low_listener_increase
+            spike.jump + (50. - listeners) * spike.low_listener_increase
         } else {
             // Otherwise, decrease the threshold by a factor of how fast the feed's listeners are rising
             // to make it easier for the feed to show up in an update
-            let pcnt     = config.spike.high_listener_dec;
-            let per_pcnt = config.spike.high_listener_dec_every;
+            let pcnt     = spike.high_listener_dec;
+            let per_pcnt = spike.high_listener_dec_every;
 
             spike.jump - (self.get_average_delta(listeners) / per_pcnt * pcnt).min(spike.jump - 0.01)
         };
