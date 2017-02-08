@@ -42,11 +42,17 @@ create_config_struct!(Misc,
     sort_order:        SortOrder  => "Feed Sort Order"   => (SortOrder::Descending),
 );
 
+create_config_struct!(Links,
+    top_feeds:   String => "Top Feeds"   => ("http://broadcastify.com/listen/top".to_string()),
+    state_feeds: String => "State Feeds" => ("http://www.broadcastify.com/listen/stid/".to_string()),
+);
+
 #[derive(Debug)]
 pub struct Config {
     pub spike:         Spike,
     pub unskewed_avg:  UnskewedAverage,
     pub misc:          Misc,
+    pub links:         Links,
     pub feed_settings: Vec<FeedSetting>,
     pub blacklist:     Vec<FeedIdent>,
     pub whitelist:     Vec<FeedIdent>,
@@ -60,6 +66,7 @@ pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
         spike:         ParseYaml::from_or_default(&doc["Spike Percentages"]),
         unskewed_avg:  ParseYaml::from_or_default(&doc["Unskewed Average"]),
         misc:          ParseYaml::from_or_default(&doc["Misc"]),
+        links:         ParseYaml::from_or_default(&doc["Source Links"]),
         feed_settings: ParseYaml::all(&doc["Feed Settings"]),
         blacklist:     ParseYaml::all(&doc["Blacklist"]),
         whitelist:     ParseYaml::all(&doc["Whitelist"]),

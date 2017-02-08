@@ -63,10 +63,12 @@ fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, Box<Error>> {
     Ok(feeds)
 }
 
-fn download_feed_data(client: &Client, source: FeedSource) -> Result<String, Box<Error>> {
+fn download_feed_data(config: &Config, client: &Client, source: FeedSource) ->
+    Result<String, Box<Error>> {
+
     let url = match source {
-        FeedSource::Top => "http://broadcastify.com/listen/top".to_string(),
-        FeedSource::State(id) => format!("http://www.broadcastify.com/listen/stid/{}", id),
+        FeedSource::Top       => config.links.top_feeds.clone(),
+        FeedSource::State(id) => format!("{}{}", &config.links.state_feeds, id),
     };
 
     let mut resp = client.get(&url).send()?;
@@ -113,10 +115,10 @@ pub fn get_latest(config: &Config) -> Result<Vec<Feed>, Box<Error>> {
     use self::FeedSource::*;
     
     let client = Client::new();
-    let mut feeds = parse(&download_feed_data(&client, Top)?, Top)?;
+    let mut feeds = parse(&download_feed_data(&config, &client, Top)?, Top)?;
 
     if let Some(id) = config.misc.state_feeds_id {
-        feeds.extend(parse(&download_feed_data(&client, State(id))?, State(id))?);
+        feeds.extend(parse(&download_feed_data(&config, &client, State(id))?, State(id))?);
         
         // Remove any state feeds that show up in the top 50 list
         feeds.sort_by_key(|f| f.id);
