@@ -3,7 +3,7 @@ extern crate chrono;
 
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
-use config::Config;
+use config::{Config, FeedIdent};
 use feed::Feed;
 use util::lerp;
 use self::chrono::{UTC, Timelike};
@@ -108,11 +108,17 @@ impl ListenerData {
             return false
         }
 
-        let spike = config.feed_settings
-                        .iter()
-                        .find(|setting| setting.id == feed.id)
-                        .map(|setting| &setting.spike)
-                        .unwrap_or(&config.spike);
+        let spike = config
+            .feed_settings
+            .iter()
+            .find(|setting| {
+                match setting.ident {
+                    FeedIdent::Name(ref name) => *name == feed.name,
+                    FeedIdent::ID(id) => id == feed.id,
+                }
+            })
+            .map(|setting| &setting.spike)
+            .unwrap_or(&config.spike);
 
         let listeners = feed.listeners as f32;
 
