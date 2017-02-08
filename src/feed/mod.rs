@@ -18,6 +18,7 @@ enum FeedSource {
 #[derive(Debug)]
 pub struct Feed {
     pub id:        u32,
+    pub state_id:  u8,
     pub name:      String,
     pub listeners: u32,
     pub alert:     Option<String>,
@@ -33,7 +34,7 @@ fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, Box<Error>> {
     lazy_static! {
         static ref TOP: Regex =
             Regex::new(
-                r#"(?s)<td class="c m">(?P<listeners>\d+)</td>.+?/listen/feed/(?P<id>\d+)">(?P<name>.+?)</a>(?:<br /><br />.<div class="messageBox">(?P<alert>.+?)</div>)?"#)
+                r#"(?s)<td class="c m">(?P<listeners>\d+)</td>.+?/listen/stid/(?P<state_id>\d+).+?/listen/feed/(?P<id>\d+)">(?P<name>.+?)</a>(?:<br /><br />.<div class="messageBox">(?P<alert>.+?)</div>)?"#)
                 .unwrap();
 
         static ref STATE: Regex =
@@ -50,9 +51,15 @@ fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, Box<Error>> {
     let mut feeds = Vec::new();
 
     for cap in regex.captures_iter(&html) {
+        let state_id = match source {
+            FeedSource::Top       => cap["state_id"].parse()?,
+            FeedSource::State(id) => id,
+        };
+
         feeds.push(
             Feed {
                 id:        cap["id"].parse()?,
+                state_id:  state_id,
                 name:      cap["name"].to_string(),
                 listeners: cap["listeners"].parse()?,
                 alert:     cap.name("alert").map(|s| s.as_str().to_string()),
@@ -90,24 +97,24 @@ fn filter(config: &Config, feeds: &mut Vec<Feed>) {
                     match *entry {
                         Name(ref name) => &feed.name == name,
                         ID(id)         => feed.id == id,
+                        State(id)      => feed.state_id == id,
                     }
                 })
         });
     }
 
-    for entry in &config.blacklist {
-        let position = match *entry {
-            Name(ref name) => feeds.iter().position(|ref feed| &feed.name == name),
-            ID(id)         => feeds.iter().position(|ref feed| feed.id == id),
-        };
-
-        match position {
-            Some(p) => {
-                feeds.remove(p);
-                ()
-            },
-            None => (),
-        }
+    if config.blacklist.len() > 0 {
+        feeds.retain(|ref feed| {
+            config.blacklist
+                .iter()
+                .any(|entry| {
+                    match *entry {
+                        Name(ref name) => &feed.name != name,
+                        ID(id)         => feed.id != id,
+                        State(id)      => feed.state_id != id,
+                    }
+                })
+        });
     }
 }
 

@@ -10,6 +10,7 @@ use self::yaml_rust::{YamlLoader, Yaml};
 create_config_enum!(FeedIdent,
     Name(String) => "Name",
     ID(u32)      => "ID",
+    State(u8)    => "State ID",
 );
 
 create_config_enum!(SortOrder,

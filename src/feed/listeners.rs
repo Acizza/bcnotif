@@ -112,9 +112,12 @@ impl ListenerData {
             .feed_settings
             .iter()
             .find(|setting| {
+                use self::FeedIdent::*;
+
                 match setting.ident {
-                    FeedIdent::Name(ref name) => *name == feed.name,
-                    FeedIdent::ID(id) => id == feed.id,
+                    Name(ref name) => feed.name == *name,
+                    ID(id)         => feed.id == id,
+                    State(id)      => feed.state_id == id,
                 }
             })
             .map(|setting| &setting.spike)
