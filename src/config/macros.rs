@@ -117,7 +117,7 @@ macro_rules! create_config_enum {
     };
 
     ($name:ident, $($field:ident => $disp_name:expr,)+) => {
-         #[derive(Debug)]
+        #[derive(Debug)]
         pub enum $name {
             $($field,)+
         }
