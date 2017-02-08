@@ -3,6 +3,7 @@ extern crate yaml_rust;
 use std::error::Error;
 use std::path::Path;
 use util;
+use feed::Feed;
 use self::yaml_rust::{YamlLoader, Yaml};
 
 #[macro_use] mod macros;
@@ -12,6 +13,18 @@ create_config_enum!(FeedIdent,
     ID(u32)      => "ID",
     State(u8)    => "State ID",
 );
+
+impl FeedIdent {
+    pub fn matches_feed(&self, feed: &Feed) -> bool {
+        use self::FeedIdent::*;
+
+        match *self {
+            Name(ref name) => *name == feed.name,
+            ID(id)         => id == feed.id,
+            State(id)      => id == feed.state_id,
+        }
+    }
+}
 
 create_config_enum!(SortOrder,
     Ascending  => "Ascending",

@@ -6,7 +6,7 @@ extern crate regex;
 
 use std::error::Error;
 use std::io::Read;
-use config::{Config, FeedIdent};
+use config::Config;
 use self::hyper::client::Client;
 use self::regex::Regex;
 
@@ -87,19 +87,11 @@ fn download_feed_data(config: &Config, client: &Client, source: FeedSource) ->
 }
 
 fn filter(config: &Config, feeds: &mut Vec<Feed>) {
-    use self::FeedIdent::*;
-
     if config.whitelist.len() > 0 {
         feeds.retain(|ref feed| {
             config.whitelist
                 .iter()
-                .any(|entry| {
-                    match *entry {
-                        Name(ref name) => &feed.name == name,
-                        ID(id)         => feed.id == id,
-                        State(id)      => feed.state_id == id,
-                    }
-                })
+                .any(|entry| entry.matches_feed(&feed))
         });
     }
 
@@ -107,13 +99,7 @@ fn filter(config: &Config, feeds: &mut Vec<Feed>) {
         feeds.retain(|ref feed| {
             config.blacklist
                 .iter()
-                .any(|entry| {
-                    match *entry {
-                        Name(ref name) => &feed.name != name,
-                        ID(id)         => feed.id != id,
-                        State(id)      => feed.state_id != id,
-                    }
-                })
+                .any(|entry| !entry.matches_feed(&feed))
         });
     }
 }
