@@ -115,4 +115,30 @@ macro_rules! create_config_enum {
             }
         }
     };
+
+    ($name:ident, $($field:ident => $disp_name:expr,)+) => {
+         #[derive(Debug)]
+        pub enum $name {
+            $($field,)+
+        }
+
+        impl ParseYaml for $name {
+            fn from(doc: &Yaml) -> Option<$name> {
+                let result: Option<String> = ParseYaml::from(&doc);
+
+                result.and_then(|result| {
+                    match result.as_str() {
+                        $($disp_name => Some($name::$field),)+
+                        _ => None,
+                    }
+                })
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> $name {
+                panic!("unable to get default for {} enum", stringify!($name));
+            }
+        }
+    };
 }

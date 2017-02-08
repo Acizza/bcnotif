@@ -14,6 +14,33 @@ use feed::listeners::{self, AverageMap, ListenerData};
 use config::Config;
 use self::chrono::{UTC, Timelike};
 
+fn sort_feeds(config: &Config, feeds: &mut Vec<feed::Feed>) {
+    use config::SortOrder::*;
+
+    feeds.sort_by(|x, y| {
+        match config.misc.sort_order {
+            Ascending  => x.listeners.cmp(&y.listeners),
+            Descending => y.listeners.cmp(&x.listeners),
+        }
+    });
+}
+
+fn show_feeds(feeds: &Vec<feed::Feed>, average_data: &AverageMap) -> Result<(), Box<Error>> {
+    for (i, feed) in feeds.iter().enumerate() {
+        let delta = average_data.get(&feed.id)
+                        .map(|avg| avg.get_average_delta(feed.listeners as f32) as i32)
+                        .unwrap_or(0);
+
+        notification::create_update(
+            i as i32 + 1,
+            feeds.len() as i32,
+            &feed,
+            delta)?;
+    }
+
+    Ok(())
+}
+
 fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), Box<Error>> {
     let feeds = feed::get_latest(&config)?;
     let hour  = UTC::now().hour() as usize;
@@ -40,8 +67,7 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), 
         listener_data.update(&config, hour, listeners, has_spiked);
 
         if has_spiked || feed.alert.is_some() {
-            let delta = listener_data.get_average_delta(listeners) as i32;
-            display_feeds.push((feed, delta));
+            display_feeds.push(feed);
         }
 
         if cfg!(feature = "show-feed-info") {
@@ -57,16 +83,9 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), 
         }
     }
 
-    // TODO: Add as a configurable option
-    // Show feeds in descending order
-    display_feeds.sort_by(|&(ref x, _), &(ref y, _)| y.listeners.cmp(&x.listeners));
-
-    for (i, &(ref feed, delta)) in display_feeds.iter().enumerate() {
-        notification::create_update(
-            i as i32 + 1,
-            display_feeds.len() as i32,
-            &feed,
-            delta)?;
+    if display_feeds.len() > 0 {
+        sort_feeds(&config, &mut display_feeds);
+        show_feeds(&display_feeds, &average_data)?;
     }
 
     Ok(())

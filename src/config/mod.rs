@@ -12,6 +12,11 @@ create_config_enum!(FeedIdent,
     ID(u32)      => "ID",
 );
 
+create_config_enum!(SortOrder,
+    Ascending  => "Ascending",
+    Descending => "Descending",
+);
+
 create_config_struct!(Spike,
     jump:                    f32 => "Jump Required"                        => 0.25,
     low_listener_increase:   f32 => "Low Listener Increase"                => [0.0, 0.005],
@@ -34,6 +39,7 @@ create_config_struct!(Misc,
 	update_time:       f32        => "Update Time"       => [5.0, 6.0],
 	minimum_listeners: u32        => "Minimum Listeners" => 15,
 	state_feeds_id:    Option<u8> => "State Feeds ID"    => None,
+    sort_order:        SortOrder  => "Feed Sort Order"   => (SortOrder::Descending),
 );
 
 #[derive(Debug)]
