@@ -1,13 +1,11 @@
 macro_rules! report_error {
     ($func:path, $err:expr) => {{
-        let err_str = &format!("{:?}", $err);
-
-        match $crate::notification::create_error(err_str) {
+        match $crate::notification::create_error($err.description()) {
             Ok(_)    => (),
             Err(err) => println!("error creating error notification: {:?}", err),
         }
 
-        $func!("error: {}", err_str);
+        $func!("error: {:?}", $err);
     }}
 }
 
