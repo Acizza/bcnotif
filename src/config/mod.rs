@@ -2,6 +2,7 @@ extern crate yaml_rust;
 
 use std::error::Error;
 use std::path::Path;
+use chrono::{Local, Datelike};
 use util;
 use feed::Feed;
 use self::yaml_rust::{YamlLoader, Yaml};
@@ -30,6 +31,40 @@ create_config_enum!(SortOrder,
     Ascending  => "Ascending",
     Descending => "Descending",
 );
+
+create_config_enum!(WeekdaySpike,
+    Sunday(Spike)    => "Sunday",
+    Monday(Spike)    => "Monday",
+    Tuesday(Spike)   => "Tuesday",
+    Wednesday(Spike) => "Wednesday",
+    Thursday(Spike)  => "Thursday",
+    Friday(Spike)    => "Friday",
+    Saturday(Spike)  => "Saturday",
+);
+
+impl WeekdaySpike {
+    pub fn get_for_today(weekday_spikes: &[WeekdaySpike]) -> Option<&Spike> {
+        use chrono::Weekday::*;
+        use self::WeekdaySpike::*;
+
+        let weekday = Local::today().weekday();
+
+        for ws in weekday_spikes {
+            match (weekday, ws) {
+                (Mon, &Monday(ref s))    |
+                (Tue, &Tuesday(ref s))   |
+                (Wed, &Wednesday(ref s)) |
+                (Thu, &Thursday(ref s))  |
+                (Fri, &Friday(ref s))    |
+                (Sat, &Saturday(ref s))  |
+                (Sun, &Sunday(ref s)) => return Some(&s),
+                _ => (),
+            }
+        }
+
+        None
+    }
+}
 
 create_config_struct!(Spike,
     jump:                    f32 => "Jump Required"                        => 0.25,
@@ -63,13 +98,27 @@ create_config_struct!(Links,
 
 #[derive(Debug)]
 pub struct Config {
-    pub spike:         Spike,
-    pub unskewed_avg:  UnskewedAverage,
-    pub misc:          Misc,
-    pub links:         Links,
-    pub feed_settings: Vec<FeedSetting>,
-    pub blacklist:     Vec<FeedIdent>,
-    pub whitelist:     Vec<FeedIdent>,
+    pub unskewed_avg: UnskewedAverage,
+    pub misc:         Misc,
+    pub links:        Links,
+    pub blacklist:    Vec<FeedIdent>,
+    pub whitelist:    Vec<FeedIdent>,
+    global_spike:     Spike,
+    weekday_spikes:   Vec<WeekdaySpike>,
+    feed_settings:    Vec<FeedSetting>,
+}
+
+impl Config {
+    pub fn get_current_spike(&self, feed: &Feed) -> &Spike {
+        self.feed_settings
+            .iter()
+            .find(|setting| setting.ident.matches_feed(&feed))
+            .map(|setting| &setting.spike)
+            .unwrap_or({
+                WeekdaySpike::get_for_today(&self.weekday_spikes)
+                    .unwrap_or(&self.global_spike)
+            })
+    }
 }
 
 pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
@@ -77,13 +126,15 @@ pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
     let doc = &doc[0]; // We don't care about multiple documents
 
     Ok(Config {
-        spike:         ParseYaml::from_or_default(&doc["Spike Percentages"]),
-        unskewed_avg:  ParseYaml::from_or_default(&doc["Unskewed Average"]),
-        misc:          ParseYaml::from_or_default(&doc["Misc"]),
-        links:         ParseYaml::from_or_default(&doc["Source Links"]),
-        feed_settings: ParseYaml::all(&doc["Feed Settings"]),
-        blacklist:     ParseYaml::all(&doc["Blacklist"]),
-        whitelist:     ParseYaml::all(&doc["Whitelist"]),
+        unskewed_avg:   ParseYaml::from_or_default(&doc["Unskewed Average"]),
+        misc:           ParseYaml::from_or_default(&doc["Misc"]),
+        links:          ParseYaml::from_or_default(&doc["Source Links"]),
+        blacklist:      ParseYaml::all(&doc["Blacklist"]),
+        whitelist:      ParseYaml::all(&doc["Whitelist"]),
+        global_spike:   ParseYaml::from_or_default(&doc["Spike Percentages"]),
+        weekday_spikes: ParseYaml::all(&doc["Weekday Spike Percentages"]),
+        feed_settings:  ParseYaml::all(&doc["Feed Settings"]),
+
     })
 }
 

@@ -108,13 +108,7 @@ impl ListenerData {
             return false
         }
 
-        let spike = config
-            .feed_settings
-            .iter()
-            .find(|setting| setting.ident.matches_feed(&feed))
-            .map(|setting| &setting.spike)
-            .unwrap_or(&config.spike);
-
+        let spike = config.get_current_spike(&feed);
         let listeners = feed.listeners as f32;
 
         // If a feed has a low number of listeners, make the threshold higher to
