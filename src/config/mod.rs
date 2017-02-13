@@ -11,7 +11,7 @@ use self::yaml_rust::{YamlLoader, Yaml};
 create_config_enum!(FeedIdent,
     Name(String) => "Name",
     ID(u32)      => "ID",
-    State(u8)    => "State ID",
+    State(u32)   => "State ID",
 );
 
 impl FeedIdent {
@@ -50,10 +50,10 @@ create_config_struct!(UnskewedAverage,
 );
 
 create_config_struct!(Misc,
-	update_time:       f32        => "Update Time"       => [5.0, 6.0],
-	minimum_listeners: u32        => "Minimum Listeners" => 15,
-	state_feeds_id:    Option<u8> => "State Feeds ID"    => None,
-    sort_order:        SortOrder  => "Feed Sort Order"   => (SortOrder::Descending),
+	update_time:       f32         => "Update Time"       => [5.0, 6.0],
+	minimum_listeners: u32         => "Minimum Listeners" => 15,
+	state_feeds_id:    Option<u32> => "State Feeds ID"    => None,
+    sort_order:        SortOrder   => "Feed Sort Order"   => (SortOrder::Descending),
 );
 
 create_config_struct!(Links,

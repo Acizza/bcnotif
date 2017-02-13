@@ -100,9 +100,13 @@ macro_rules! create_config_enum {
         impl ParseYaml for $name {
             fn from(doc: &Yaml) -> Option<$name> {
                 $(
-                match ParseYaml::from(&doc[$disp_name]) {
-                    Some(v) => return Some($name::$field(v)),
-                    None    => (),
+                let elem = &doc[$disp_name];
+
+                if !elem.is_badvalue() {
+                    match ParseYaml::from(elem) {
+                        Some(v) => return Some($name::$field(v)),
+                        None    => (),
+                    }
                 }
                 )+
                 None

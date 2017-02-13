@@ -12,13 +12,13 @@ use self::regex::Regex;
 
 enum FeedSource {
     Top,
-    State(u8),
+    State(u32),
 }
 
 #[derive(Debug)]
 pub struct Feed {
     pub id:        u32,
-    pub state_id:  u8,
+    pub state_id:  u32,
     pub name:      String,
     pub listeners: u32,
     pub alert:     Option<String>,

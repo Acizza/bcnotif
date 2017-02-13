@@ -170,7 +170,7 @@ pub fn save_averages(path: &Path, averages: &AverageMap) -> Result<(), csv::Erro
     for (id, data) in averages {
         let hourly = data.hourly
             .iter()
-            .map(|&v| v as i32)
+            .map(|&v| v as u32)
             .collect::<Vec<_>>();
 
         writer.encode((id, hourly))?;
