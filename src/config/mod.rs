@@ -80,7 +80,7 @@ create_config_struct!(FeedSetting,
 
 create_config_struct!(UnskewedAverage,
     reset_pcnt:      f32 => "Reset To Average Percentage"  => [0.0, 0.15],
-    adjust_pcnt:     f32 => "Adjust to Average Percentage" => [0.0, 0.01],
+    adjust_pcnt:     f32 => "Adjust to Average Percentage" => [0.0, 0.0075],
     spikes_required: u8  => "Listener Spikes Required"     => 1,
 );
 
