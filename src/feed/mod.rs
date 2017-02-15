@@ -4,9 +4,9 @@ extern crate csv;
 extern crate hyper;
 extern crate regex;
 
-use std::error::Error;
 use std::io::Read;
 use config::Config;
+use util::error::DetailedError;
 use self::hyper::client::Client;
 use self::regex::Regex;
 
@@ -30,7 +30,7 @@ impl PartialEq for Feed {
     }
 }
 
-fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, Box<Error>> {
+fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, DetailedError> {
     lazy_static! {
         static ref TOP: Regex =
             Regex::new(
@@ -52,16 +52,16 @@ fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, Box<Error>> {
 
     for cap in regex.captures_iter(&html) {
         let state_id = match source {
-            FeedSource::Top       => cap["state_id"].parse()?,
+            FeedSource::Top       => try_detailed!(cap["state_id"].parse::<u32>()),
             FeedSource::State(id) => id,
         };
 
         feeds.push(
             Feed {
-                id:        cap["id"].parse()?,
+                id:        try_detailed!(cap["id"].parse()),
                 state_id:  state_id,
                 name:      cap["name"].to_string(),
-                listeners: cap["listeners"].parse()?,
+                listeners: try_detailed!(cap["listeners"].parse()),
                 alert:     cap.name("alert").map(|s| s.as_str().to_string()),
             }
         );
@@ -71,17 +71,17 @@ fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, Box<Error>> {
 }
 
 fn download_feed_data(config: &Config, client: &Client, source: FeedSource) ->
-    Result<String, Box<Error>> {
+    Result<String, DetailedError> {
 
     let url = match source {
         FeedSource::Top       => config.links.top_feeds.clone(),
         FeedSource::State(id) => format!("{}{}", &config.links.state_feeds, id),
     };
 
-    let mut resp = client.get(&url).send()?;
+    let mut resp = try_detailed!(client.get(&url).send());
 
     let mut body = String::new();
-    resp.read_to_string(&mut body)?;
+    try_detailed!(resp.read_to_string(&mut body));
 
     Ok(body)
 }
@@ -104,7 +104,7 @@ fn filter(config: &Config, feeds: &mut Vec<Feed>) {
     }
 }
 
-pub fn get_latest(config: &Config) -> Result<Vec<Feed>, Box<Error>> {
+pub fn get_latest(config: &Config) -> Result<Vec<Feed>, DetailedError> {
     use self::FeedSource::*;
     
     let client = Client::new();

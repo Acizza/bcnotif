@@ -47,19 +47,56 @@ pub fn lerp(v0: f32, v1: f32, t: f32) -> f32 {
     (1. - t) * v0 + t * v1
 }
 
+#[macro_use]
 pub mod error {
     use std::error::Error;
 
-    /// Reports a provided error via a notification and a terminal message
-    ///
-    /// # Arguments
-    /// * `source_header` - A string representing the section the error came from
-    /// * `err` - The error to report
-    pub fn report(source_header: &str, err: &Box<Error>) {
-        let msg = format!("{} error: {}", source_header, err.description());
-        println!("{}", msg);
+    #[derive(Debug)]
+    pub struct DetailedError {
+        pub err:  Box<Error>,
+        pub func: &'static str,
+        pub file: &'static str,
+        pub line: u32,
+    }
 
-        match ::notification::create_error(&msg) {
+    #[macro_export]
+    macro_rules! try_detailed {
+        ($func:path, $($arg:expr),*) => {{
+            match $func($($arg,)*) {
+                Ok(v) => v,
+                Err(err) => return Err(DetailedError {
+                    err:  err.into(),
+                    func: stringify!($func),
+                    file: file!(),
+                    line: line!(),
+                }),
+            }
+        }};
+
+        ($($token:tt)+) => {{
+            match $($token)+ {
+                Ok(v) => v,
+                Err(err) => return Err(DetailedError {
+                    err:  err.into(),
+                    // Concatting each token removes unnecessary spacing
+                    func: concat!($(stringify!($token),)+),
+                    file: file!(),
+                    line: line!(),
+                }),
+            }
+        }};
+    }
+
+    /// Displays the provided error with a notification and by writing it to the terminal
+    pub fn report(de: &DetailedError) {
+        let msg = format!("[{}:{} {}]\nerror: ",
+                    de.file,
+                    de.line,
+                    de.func);
+
+        println!("{}{:?}", msg, de.err);
+
+        match ::notification::create_error(&format!("{}{}", msg, de.err.description())) {
             Ok(_)    => (),
             Err(err) => println!("error creating error notification: {:?}", err),
         }
