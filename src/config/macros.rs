@@ -89,7 +89,6 @@ macro_rules! create_config_struct {
     };
 }
 
-#[macro_export]
 macro_rules! get_enum_field_name {
     ($field:ident, self)            => (stringify!($field));
     ($field:ident, $disp_name:expr) => ($disp_name);
