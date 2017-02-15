@@ -14,7 +14,7 @@ const MOVING_AVG_SIZE: usize = 5;
 pub struct Average {
     pub current: f32,
     pub last:    f32,
-    pub moving:  VecDeque<f32>,
+    moving:      VecDeque<f32>,
 }
 
 impl Average {
@@ -26,9 +26,9 @@ impl Average {
         }
 
         Average {
-            current:    average,
-            last:       average,
-            moving:     moving,
+            current: average,
+            last:    average,
+            moving:  moving,
         }
     }
 

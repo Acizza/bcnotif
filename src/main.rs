@@ -4,7 +4,7 @@ extern crate chrono;
 mod config;
 mod feed;
 mod notification;
-#[macro_use] mod util;
+mod util;
 
 use std::thread;
 use std::time::Duration;
@@ -12,6 +12,7 @@ use std::error::Error;
 use std::collections::HashMap;
 use feed::listeners::{self, AverageMap, ListenerData};
 use config::Config;
+use util::error;
 use self::chrono::{UTC, Timelike};
 
 fn sort_feeds(config: &Config, feeds: &mut Vec<feed::Feed>) {
@@ -91,29 +92,43 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), 
     Ok(())
 }
 
-fn main() {
-    let config_path   = check_err_p!(util::verify_local_file("config.yaml"));
-    let averages_path = check_err_p!(util::verify_local_file("averages.csv"));
+fn start() -> Result<(), Box<Error>> {
+    let config_path   = util::verify_local_file("config.yaml")?;
+    let averages_path = util::verify_local_file("averages.csv")?;
 
-    let mut listeners = check_err!(
-        listeners::load_averages(&averages_path),
-        HashMap::new()
-    );
+    let mut listeners = listeners::load_averages(&averages_path)
+        .unwrap_or(HashMap::new());
+
+    let mut perform_cycle = || {
+        let config = config::load_from_file(&config_path)?;
+
+        perform_update(&config, &mut listeners)?;
+        listeners::save_averages(&averages_path, &listeners)?;
+
+        Ok(config)
+    };
 
     loop {
         if cfg!(feature = "show-feed-info") {
             println!("updating");
         }
 
-        let config = check_err_c!(config::load_from_file(&config_path), {
-            // Sleep on an error to prevent a potential infinite loop
-            thread::sleep(Duration::from_secs(6 * 60));
-        });
+        let update_time =
+            match perform_cycle() {
+                Ok(config) => (config.misc.update_time * 60.) as u64,
+                Err(err) => {
+                    error::report("update", &err);
+                    config::Misc::default().update_time as u64
+                },
+            };
 
-        check_err!(perform_update(&config, &mut listeners));
-        check_err!(listeners::save_averages(&averages_path, &listeners));
-
-        let update_time = (config.misc.update_time * 60.) as u64;
         thread::sleep(Duration::from_secs(update_time));
+    }
+}
+
+fn main() {
+    match start() {
+        Ok(_) => (),
+        Err(err) => error::report("fatal", &err),
     }
 }

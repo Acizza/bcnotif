@@ -1,5 +1,3 @@
-#[macro_use] pub mod error;
-
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{self, Read, Error, ErrorKind};
@@ -47,4 +45,23 @@ pub fn read_file(path: &Path) -> io::Result<String> {
 
 pub fn lerp(v0: f32, v1: f32, t: f32) -> f32 {
     (1. - t) * v0 + t * v1
+}
+
+pub mod error {
+    use std::error::Error;
+
+    /// Reports a provided error via a notification and a terminal message
+    ///
+    /// # Arguments
+    /// * `source_header` - A string representing the section the error came from
+    /// * `err` - The error to report
+    pub fn report(source_header: &str, err: &Box<Error>) {
+        let msg = format!("{} error: {}", source_header, err.description());
+        println!("{}", msg);
+
+        match ::notification::create_error(&msg) {
+            Ok(_)    => (),
+            Err(err) => println!("error creating error notification: {:?}", err),
+        }
+    }
 }
