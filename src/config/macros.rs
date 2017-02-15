@@ -90,8 +90,14 @@ macro_rules! create_config_struct {
 }
 
 #[macro_export]
+macro_rules! get_enum_field_name {
+    ($field:ident, self)            => (stringify!($field));
+    ($field:ident, $disp_name:expr) => ($disp_name);
+}
+
+#[macro_export]
 macro_rules! create_config_enum {
-    ($name:ident, $($field:ident($field_t:ty) => $disp_name:expr,)+) => {
+    ($name:ident, $($field:ident($field_t:ty) => $disp_name:tt,)+) => {
         #[derive(Debug)]
         pub enum $name {
             $($field($field_t),)+
@@ -100,7 +106,7 @@ macro_rules! create_config_enum {
         impl ParseYaml for $name {
             fn from(doc: &Yaml) -> Option<$name> {
                 $(
-                let elem = &doc[$disp_name];
+                let elem = &doc[get_enum_field_name!($field, $disp_name)];
 
                 if !elem.is_badvalue() {
                     match ParseYaml::from(elem) {
@@ -120,7 +126,7 @@ macro_rules! create_config_enum {
         }
     };
 
-    ($name:ident, $($field:ident => $disp_name:expr,)+) => {
+    ($name:ident, $($field:ident => $disp_name:tt,)+) => {
         #[derive(Debug)]
         pub enum $name {
             $($field,)+
@@ -132,7 +138,7 @@ macro_rules! create_config_enum {
 
                 result.and_then(|result| {
                     match result.as_str() {
-                        $($disp_name => Some($name::$field),)+
+                        $(get_enum_field_name!($field, $disp_name) => Some($name::$field),)+
                         _ => None,
                     }
                 })

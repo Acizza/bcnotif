@@ -10,8 +10,8 @@ use self::yaml_rust::{YamlLoader, Yaml};
 #[macro_use] mod macros;
 
 create_config_enum!(FeedIdent,
-    Name(String) => "Name",
-    ID(u32)      => "ID",
+    Name(String) => self,
+    ID(u32)      => self,
     State(u32)   => "State ID",
 );
 
@@ -28,18 +28,18 @@ impl FeedIdent {
 }
 
 create_config_enum!(SortOrder,
-    Ascending  => "Ascending",
-    Descending => "Descending",
+    Ascending  => self,
+    Descending => self,
 );
 
 create_config_enum!(WeekdaySpike,
-    Sunday(Spike)    => "Sunday",
-    Monday(Spike)    => "Monday",
-    Tuesday(Spike)   => "Tuesday",
-    Wednesday(Spike) => "Wednesday",
-    Thursday(Spike)  => "Thursday",
-    Friday(Spike)    => "Friday",
-    Saturday(Spike)  => "Saturday",
+    Sunday(Spike)    => self,
+    Monday(Spike)    => self,
+    Tuesday(Spike)   => self,
+    Wednesday(Spike) => self,
+    Thursday(Spike)  => self,
+    Friday(Spike)    => self,
+    Saturday(Spike)  => self,
 );
 
 impl WeekdaySpike {
