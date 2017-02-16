@@ -26,7 +26,12 @@ fn sort_feeds(config: &Config, feeds: &mut Vec<feed::Feed>) {
 }
 
 fn show_feeds(feeds: &Vec<feed::Feed>, average_data: &AverageMap) -> Result<(), DetailedError> {
-    for (i, feed) in feeds.iter().enumerate() {
+    #[cfg(unix)]
+    let iter = feeds.iter().enumerate();
+    #[cfg(windows)]
+    let iter = feeds.iter().enumerate().rev();
+
+    for (i, feed) in iter {
         let delta = average_data.get(&feed.id)
                         .map(|avg| avg.get_average_delta(feed.listeners as f32) as i32)
                         .unwrap_or(0);
