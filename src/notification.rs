@@ -64,11 +64,7 @@ mod windows {
         };
 
         unsafe {
-            let new_icon = user32::LoadIconW(0 as HINSTANCE, icon);
-
-            if !new_icon.is_null() {
-                notif.hIcon = new_icon;
-            }
+            notif.hIcon = user32::LoadIconW(0 as HINSTANCE, icon);
 
             let title = to_wstring(title);
             ptr::copy(title.as_ptr(), notif.szInfoTitle.as_mut_ptr(), cmp::min(title.len(), notif.szInfoTitle.len()));
