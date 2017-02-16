@@ -1,3 +1,6 @@
+#[cfg(windows)]
+pub mod windows;
+
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{self, Read, Error, ErrorKind};
