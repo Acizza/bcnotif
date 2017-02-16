@@ -68,8 +68,7 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), 
             .entry(feed.id)
             .or_insert(ListenerData::new(listeners, [0.; 24]));
 
-        let has_spiked = listener_data.has_spiked(&config, &feed);
-        listener_data.update(&config, hour, listeners, has_spiked);
+        let has_spiked = listener_data.step(&config, hour, &feed);
 
         if has_spiked || feed.alert.is_some() {
             display_feeds.push(feed);

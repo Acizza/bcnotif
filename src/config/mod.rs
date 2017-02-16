@@ -82,6 +82,7 @@ create_config_struct!(UnskewedAverage,
     reset_pcnt:      f32 => "Reset To Average Percentage"  => [0.0, 0.15],
     adjust_pcnt:     f32 => "Adjust to Average Percentage" => [0.0, 0.0075],
     spikes_required: u8  => "Listener Spikes Required"     => 1,
+    jump_required:   f32 => "Listener Jump Required"       => [1.1, 4.0],
 );
 
 create_config_struct!(Misc,

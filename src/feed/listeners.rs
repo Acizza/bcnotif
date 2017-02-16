@@ -32,7 +32,7 @@ impl Average {
         }
     }
 
-    pub fn update(&mut self, value: f32) {
+    fn update(&mut self, value: f32) {
         self.moving.push_back(value);
 
         if self.moving.len() > MOVING_AVG_SIZE {
@@ -62,24 +62,33 @@ impl ListenerData {
         }
     }
 
-    pub fn update(&mut self, config: &Config, hour: usize, listeners: f32, has_spiked: bool) {
-        self.average.update(listeners);
-        self.update_hourly(&config, hour, has_spiked);
-    }
+    pub fn step(&mut self, config: &Config, hour: usize, feed: &Feed) -> bool {
+        let has_spiked = self.has_spiked(&config, &feed);
 
-    fn update_hourly(&mut self, config: &Config, hour: usize, has_spiked: bool) {
         self.spike_count = if has_spiked {
             self.spike_count + 1
         } else {
             0
         };
 
+        let listeners = feed.listeners as f32;
+        self.average.update(listeners);
+        self.update_unskewed(&config, listeners, has_spiked);
+
+        self.hourly[hour] = match self.unskewed_avg {
+            Some(unskewed) => unskewed,
+            None           => self.average.current,
+        };
+
+        has_spiked
+    }
+
+    fn update_unskewed(&mut self, config: &Config, listeners: f32, has_spiked: bool) {
         match self.unskewed_avg {
             Some(unskewed) => {
                 // Remove the unskewed average when the current average is close
                 if self.average.current - unskewed < unskewed * config.unskewed_avg.reset_pcnt {
                     self.unskewed_avg = None;
-                    self.hourly[hour] = self.average.current;
                 } else {
                     // Slowly adjust the unskewed average to adjust to any natural listener increases
                     let new_val = lerp(unskewed,
@@ -87,19 +96,22 @@ impl ListenerData {
                                         config.unskewed_avg.adjust_pcnt);
 
                     self.unskewed_avg = Some(new_val);
-                    self.hourly[hour] = new_val;
                 }
             },
-            None => {
-                if has_spiked && self.spike_count > config.unskewed_avg.spikes_required
-                    && self.average.last > 0. {
-                    // Use the current average instead of the last average to allow
-                    // the saved average to catch up to natural listener changes
-                    self.unskewed_avg = Some(self.average.current);
-                }
+            None if has_spiked && self.average.last > 0. => {
+                let has_spiked_enough = self.spike_count > config.unskewed_avg.spikes_required;
 
-                self.hourly[hour] = self.average.current;
-            }
+                // The main purpose of this is to "capture" feeds on the first update cycle
+                // that are hundreds if not thousands of listeners above normal
+                let has_jumped_enough =
+                    listeners - self.average.current >
+                    self.average.last * config.unskewed_avg.jump_required;
+
+                if has_spiked_enough || has_jumped_enough {
+                    self.unskewed_avg = Some(self.average.last);
+                }
+            },
+            None => (),
         }
     }
 
@@ -128,7 +140,7 @@ impl ListenerData {
             print!(" THR: {}", threshold);
         }
         
-        (listeners - self.average.current) >= listeners * threshold
+        listeners - self.average.current >= listeners * threshold
     }
 
     pub fn get_average_delta(&self, listeners: f32) -> f32 {
