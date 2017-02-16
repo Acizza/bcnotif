@@ -12,5 +12,12 @@ regex       = "0.2.*"
 lazy_static = "0.2.*"
 csv         = "0.15.*"
 chrono      = "0.3.*"
-notify-rust = "3.*"
 yaml-rust   = "0.3.*"
+
+[target.'cfg(unix)'.dependencies]
+notify-rust = "3.*"
+
+[target.'cfg(windows)'.dependencies]
+winapi       = "0.2.*"
+user32-sys   = "0.2.*"
+kernel32-sys = "0.2.*"
