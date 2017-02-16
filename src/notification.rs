@@ -36,6 +36,7 @@ mod windows {
     extern crate user32;
     extern crate kernel32;
 
+    use std::cmp;
     use std::error::Error;
     use std::ffi::OsStr;
     use std::mem;
@@ -178,10 +179,10 @@ mod windows {
             }
 
             let title = to_wstring(title);
-            ptr::copy(title.as_ptr(), notif.szInfoTitle.as_mut_ptr(), title.len());
+            ptr::copy(title.as_ptr(), notif.szInfoTitle.as_mut_ptr(), cmp::min(title.len(), notif.szInfoTitle.len()));
 
             let body = to_wstring(body);
-            ptr::copy(body.as_ptr(), notif.szInfo.as_mut_ptr(), body.len());
+            ptr::copy(body.as_ptr(), notif.szInfo.as_mut_ptr(), cmp::min(body.len(), notif.szInfo.len()));
 
             Shell_NotifyIconW(NIM_ADD, notif);
             Shell_NotifyIconW(NIM_DELETE, notif);
