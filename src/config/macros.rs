@@ -50,6 +50,11 @@ macro_rules! gen_struct_value {
         try_opt!(ParseYaml::from(&$parent[$disp_name]))
     }};
 
+    // Array
+    ($parent:expr, $disp_name:expr, all) => {{
+        ParseYaml::all(&$parent[$disp_name])
+    }};
+
     // Value
     ($parent:expr, $disp_name:expr, $default:expr) => {{
         ParseYaml::from(&$parent[$disp_name]).unwrap_or($default)
@@ -59,6 +64,7 @@ macro_rules! gen_struct_value {
 macro_rules! get_default {
     (default)                    => (Default::default());
     (fail)                       => (Default::default());
+    (all)                        => (Vec::new());
     ([$min:expr, $default:expr]) => ($default);
     ($default:expr)              => ($default);
 }

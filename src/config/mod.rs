@@ -76,8 +76,9 @@ create_config_struct!(Spike,
 );
 
 create_config_struct!(FeedSetting,
-    ident: FeedIdent => self                => fail,
-    spike: Spike     => "Spike Percentages" => fail,
+    ident:         FeedIdent         => self                        => fail,
+    spike:         Spike             => "Spike Percentages"         => fail,
+    weekday_spike: Vec<WeekdaySpike> => "Weekday Spike Percentages" => all,
 );
 
 create_config_struct!(UnskewedAverage,
@@ -116,7 +117,10 @@ impl Config {
         self.feed_settings
             .iter()
             .find(|setting| setting.ident.matches_feed(&feed))
-            .map(|setting| &setting.spike)
+            .map(|setting| {
+                WeekdaySpike::get_for_today(&setting.weekday_spike)
+                    .unwrap_or(&setting.spike)
+            })
             .unwrap_or({
                 WeekdaySpike::get_for_today(&self.weekday_spikes)
                     .unwrap_or(&self.global_spike)
