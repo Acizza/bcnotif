@@ -12,9 +12,9 @@ use self::winapi::windef::{HWND, HICON};
 use self::winapi::winnt::WCHAR;
 use self::winapi::{GUID, SW_HIDE};
 
-const NIF_ICON: UINT   = 0x2;
-const NIF_TIP: UINT    = 0x4;
-const NIF_INFO: UINT   = 0x10;
+const NIF_ICON:  UINT = 0x2;
+const NIF_TIP:   UINT = 0x4;
+const NIF_INFO:  UINT = 0x10;
 const NIIF_USER: UINT = 0x4;
 
 const ERROR_CLASS_ALREADY_EXISTS: UINT = 1410;
