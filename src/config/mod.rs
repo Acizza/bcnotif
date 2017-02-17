@@ -10,9 +10,10 @@ use self::yaml_rust::{YamlLoader, Yaml};
 #[macro_use] mod macros;
 
 create_config_enum!(FeedIdent,
-    Name(String) => self,
-    ID(u32)      => self,
-    State(u32)   => "State ID",
+    Name(String)   => self,
+    ID(u32)        => self,
+    County(String) => self,
+    State(u32)     => "State ID",
 );
 
 impl FeedIdent {
@@ -22,6 +23,7 @@ impl FeedIdent {
         match *self {
             Name(ref name) => *name == feed.name,
             ID(id)         => id == feed.id,
+            County(ref c)  => *c == feed.county,
             State(id)      => id == feed.state_id,
         }
     }

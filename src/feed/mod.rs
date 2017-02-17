@@ -19,6 +19,7 @@ enum FeedSource {
 pub struct Feed {
     pub id:        u32,
     pub state_id:  u32,
+    pub county:    String,
     pub name:      String,
     pub listeners: u32,
     pub alert:     Option<String>,
@@ -34,12 +35,12 @@ fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, DetailedError> {
     lazy_static! {
         static ref TOP: Regex =
             Regex::new(
-                r#"(?s)<td class="c m">(?P<listeners>\d+)</td>.+?/listen/stid/(?P<state_id>\d+).+?/listen/feed/(?P<id>\d+)">(?P<name>.+?)</a>(?:<br /><br />.<div class="messageBox">(?P<alert>.+?)</div>)?"#)
+                r#"(?s)<td class="c m">(?P<listeners>\d+)</td>.+?/listen/stid/(?P<state_id>\d+).+?/listen/ctid/\d+">(?P<county>.+?)</a>.+?/listen/feed/(?P<id>\d+)">(?P<name>.+?)</a>(?:<br /><br />.<div class="messageBox">(?P<alert>.+?)</div>)?"#)
                 .unwrap();
 
         static ref STATE: Regex =
             Regex::new(
-                r#"(?s)w1p">.+?<a href="/listen/feed/(?P<id>\d+)">(?P<name>.+?)</a>.+?(?:bold">(?P<alert>.+?)</font>.+?)?<td class="c m">(?P<listeners>\d+)</'td>"#)
+                r#"(?s)listen/ctid/\d+">(?P<county>.+?)</a>.+?w1p">.+?<a href="/listen/feed/(?P<id>\d+)">(?P<name>.+?)</a>.+?(?:bold">(?P<alert>.+?)</font>.+?)?<td class="c m">(?P<listeners>\d+)</'td>"#)
                 .unwrap();
     }
 
@@ -60,6 +61,7 @@ fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, DetailedError> {
             Feed {
                 id:        try_detailed!(cap["id"].parse()),
                 state_id:  state_id,
+                county:    cap["county"].to_string(),
                 name:      cap["name"].to_string(),
                 listeners: try_detailed!(cap["listeners"].parse()),
                 alert:     cap.name("alert").map(|s| s.as_str().to_string()),
