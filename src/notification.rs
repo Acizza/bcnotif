@@ -55,7 +55,7 @@ mod windows {
             };
         }
 
-        let mut notif = NOTIF_DATA.lock().unwrap();
+        let mut notif = NOTIF_DATA.lock()?;
         let notif = &mut notif.data;
 
         let icon = match icon {
