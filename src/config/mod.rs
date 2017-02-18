@@ -77,7 +77,7 @@ create_config_struct!(Spike,
 
 create_config_struct!(FeedSetting,
     ident:         FeedIdent         => self                        => fail,
-    spike:         Spike             => "Spike Percentages"         => fail,
+    spike:         Spike             => "Spike Percentages"         => default,
     weekday_spike: Vec<WeekdaySpike> => "Weekday Spike Percentages" => all,
 );
 
