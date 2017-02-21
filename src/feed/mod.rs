@@ -35,7 +35,7 @@ fn parse(html: &str, source: FeedSource) -> Result<Vec<Feed>, DetailedError> {
     lazy_static! {
         static ref TOP: Regex =
             Regex::new(
-                r#"(?s)<td class="c m">(?P<listeners>\d+)</td>.+?/listen/stid/(?P<state_id>\d+)(?:.+?/listen/ctid/\d+">(?P<county>.+?)</a>)?.+?/listen/feed/(?P<id>\d+)">(?P<name>.+?)</a>(?:<br /><br />.<div class="messageBox">(?P<alert>.+?)</div>)?"#)
+                r#"(?s)<td class="c m">(?P<listeners>\d+)</td>.+?/listen/stid/(?P<state_id>\d+)">(?:.+?/listen/ctid/\d+">(?P<county>.+?)</a>)*?.+?/listen/feed/(?P<id>\d+)">(?P<name>.+?)</a>(?:<br /><br />.<div class="messageBox">(?P<alert>.+?)</div>)?"#)
                 .unwrap();
 
         static ref STATE: Regex =
