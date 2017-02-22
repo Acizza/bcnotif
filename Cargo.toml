@@ -8,11 +8,11 @@ show-feed-info = []
 
 [dependencies]
 hyper       = "0.10.*"
-regex       = "0.2.*"
 lazy_static = "0.2.*"
 csv         = "0.15.*"
 chrono      = "0.3.*"
 yaml-rust   = "0.3.*"
+select      = { git = "https://github.com/utkarshkukreti/select.rs" }
 
 [target.'cfg(unix)'.dependencies]
 notify-rust = "3.*"

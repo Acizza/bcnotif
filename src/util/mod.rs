@@ -50,6 +50,16 @@ pub fn lerp(v0: f32, v1: f32, t: f32) -> f32 {
     (1. - t) * v0 + t * v1
 }
 
+#[macro_export]
+macro_rules! try_opt {
+    ($value:expr) => {{
+        match $value {
+            Some(v) => v,
+            None    => return None,
+        }
+    }};
+}
+
 #[macro_use]
 pub mod error {
     use std::error::Error;

@@ -1,12 +1,3 @@
-macro_rules! try_opt {
-    ($value:expr) => {{
-        match $value {
-            Some(v) => v,
-            None    => return None,
-        }
-    }};
-}
-
 macro_rules! gen_struct_value {
     // Default with no display name
     ($parent:expr, self, default) => {{
