@@ -8,7 +8,6 @@ show-feed-info = []
 
 [dependencies]
 hyper       = "0.10.*"
-lazy_static = "0.2.*"
 csv         = "0.15.*"
 chrono      = "0.3.*"
 yaml-rust   = "0.3.*"

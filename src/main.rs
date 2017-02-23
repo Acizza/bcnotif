@@ -1,5 +1,4 @@
 extern crate chrono;
-#[macro_use] extern crate lazy_static;
 
 #[macro_use] mod util;
 mod config;
