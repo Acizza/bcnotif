@@ -6,8 +6,13 @@ extern crate hyper;
 
 use std::io::Read;
 use config::Config;
-use util::error::DetailedError;
 use self::hyper::client::Client;
+
+error_chain! {
+    links {
+        Parse(parse::Error, parse::ErrorKind);
+    }
+}
 
 enum FeedSource {
     Top,
@@ -30,18 +35,19 @@ impl PartialEq for Feed {
     }
 }
 
-fn download_feed_data(config: &Config, client: &Client, source: FeedSource) ->
-    Result<String, DetailedError> {
-
+fn download_feed_data(config: &Config, client: &Client, source: FeedSource) -> Result<String> {
     let url = match source {
         FeedSource::Top       => config.links.top_feeds.clone(),
         FeedSource::State(id) => format!("{}{}", &config.links.state_feeds, id),
     };
 
-    let mut resp = try_detailed!(client.get(&url).send());
+    let mut resp = client.get(&url).send()
+        .chain_err(|| format!("failed to download feed data from {}", url))?;
 
     let mut body = String::new();
-    try_detailed!(resp.read_to_string(&mut body));
+
+    resp.read_to_string(&mut body)
+        .chain_err(|| format!("failed to read feed data into string from {}", url))?;
 
     Ok(body)
 }
@@ -64,7 +70,7 @@ fn filter(config: &Config, feeds: &mut Vec<Feed>) {
     }
 }
 
-pub fn get_latest(config: &Config) -> Result<Vec<Feed>, DetailedError> {
+pub fn get_latest(config: &Config) -> Result<Vec<Feed>> {
     use self::FeedSource::*;
     
     let client = Client::new();

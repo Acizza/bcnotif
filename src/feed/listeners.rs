@@ -10,6 +10,8 @@ use self::chrono::{UTC, Timelike};
 
 const MOVING_AVG_SIZE: usize = 5;
 
+error_chain! {}
+
 #[derive(Debug)]
 pub struct Average {
     pub current: f32,
@@ -155,23 +157,25 @@ impl ListenerData {
 
 pub type AverageMap = HashMap<u32, ListenerData>;
 
-pub fn load_averages(path: &Path) -> Result<AverageMap, csv::Error> {
+pub fn load_averages(path: &Path) -> Result<AverageMap> {
     let mut avgs   = HashMap::new();
-    let mut reader = csv::Reader::from_file(path)?
+    let mut reader = csv::Reader::from_file(path)
+        .chain_err(|| "failed to open listener average file")?
         .has_headers(false);
 
     let hour = UTC::now().hour() as usize;
 
     for record in reader.decode() {
-        let (id, avg): (_, [_; 24]) = record?;
+        let (id, avg): (_, [_; 24]) = record.chain_err(|| "failed to decode listener average")?;
         avgs.insert(id, ListenerData::new(avg[hour], avg));
     }
 
     Ok(avgs)
 }
 
-pub fn save_averages(path: &Path, averages: &AverageMap) -> Result<(), csv::Error> {
-    let mut writer = csv::Writer::from_file(path)?;
+pub fn save_averages(path: &Path, averages: &AverageMap) -> Result<()> {
+    let mut writer = csv::Writer::from_file(path)
+        .chain_err(|| "failed to open listener average file")?;
     
     for (id, data) in averages {
         let hourly = data.hourly
@@ -179,7 +183,8 @@ pub fn save_averages(path: &Path, averages: &AverageMap) -> Result<(), csv::Erro
             .map(|&v| v as u32)
             .collect::<Vec<_>>();
 
-        writer.encode((id, hourly))?;
+        writer.encode((id, hourly))
+            .chain_err(|| "failed to encode listener average")?;
     }
 
     Ok(())

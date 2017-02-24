@@ -1,5 +1,6 @@
-use std::error::Error;
 use feed::Feed;
+
+error_chain! {}
 
 #[derive(Debug)]
 pub enum Icon {
@@ -10,11 +11,10 @@ pub enum Icon {
 #[cfg(unix)]
 mod unix {
     extern crate notify_rust;
-    use std::error::Error;
-    use notification::Icon;
+    use notification::*;
     use self::notify_rust::Notification;
 
-    pub fn create(icon: Icon, title: &str, body: &str) -> Result<(), Box<Error>> {
+    pub fn create(icon: Icon, title: &str, body: &str) -> Result<()> {
         let icon = match icon {
             Icon::Update => "emblem-sound",
             Icon::Error  => "dialog-error",
@@ -25,8 +25,9 @@ mod unix {
             .body(body)
             .icon(icon)
             .show()
-            .map(|_| ())
-            .map_err(|e| e.into())
+            .chain_err(|| "failed to create notification")?;
+
+        Ok(())
     }
 }
 
@@ -37,25 +38,25 @@ mod windows {
     extern crate kernel32;
 
     use std::cmp;
-    use std::error::Error;
     use std::ptr;
     use std::sync::Mutex;
     use self::winapi::winuser::{IDI_INFORMATION, IDI_ERROR};
     use self::winapi::minwindef::{UINT, HINSTANCE};
-    use notification::Icon;
+    use notification::*;
     use util::windows::*;
 
     const NIM_ADD: UINT    = 0;
     const NIM_DELETE: UINT = 2;
 
-    pub fn create(icon: Icon, title: &str, body: &str) -> Result<(), Box<Error>> {
+    pub fn create(icon: Icon, title: &str, body: &str) -> Result<()> {
         lazy_static! {
             static ref NOTIF_DATA: Mutex<NotifData> = unsafe {
                 Mutex::new(NotifData::new())
             };
         }
 
-        let mut notif = NOTIF_DATA.lock()?;
+        // The program will most likely crash before ever encountering a poisoned lock here
+        let mut notif = NOTIF_DATA.lock().unwrap();
         let notif = &mut notif.data;
 
         let icon = match icon {
@@ -86,9 +87,7 @@ use self::unix::create;
 #[cfg(windows)]
 use self::windows::create;
 
-pub fn create_update(feed_idx: i32, max_feed_idx: i32, feed: &Feed, feed_delta: i32) ->
-    Result<(), Box<Error>> {
-        
+pub fn create_update(feed_idx: i32, max_feed_idx: i32, feed: &Feed, feed_delta: i32) -> Result<()> {
     let alert = match feed.alert {
         Some(ref alert) => format!("\nAlert: {}", alert),
         None            => String::new(),
@@ -105,7 +104,7 @@ pub fn create_update(feed_idx: i32, max_feed_idx: i32, feed: &Feed, feed_delta: 
             feed.id))
 }
 
-pub fn create_error(body: &str) -> Result<(), Box<Error>> {
+pub fn create_error(body: &str) -> Result<()> {
     create(
         Icon::Error,
         "Broadcastify Update Error",

@@ -3,46 +3,62 @@ pub mod windows;
 
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use std::io::{self, Read, Error, ErrorKind};
+use std::io::Read;
 
-pub fn local_path(path: &str) -> io::Result<PathBuf> {
-    let mut base = ::std::env::current_exe()?;
+error_chain! {
+    errors {
+        EmptyFile(path: String) {
+            description("empty file")
+            display("file is empty: {}", path)
+        }
+    }
+}
+
+pub fn local_path(path: &str) -> Result<PathBuf> {
+    let mut base = ::std::env::current_exe()
+        .chain_err(|| format!("failed to get executable path"))?;
+
     base.pop();
     base.push(path);
     Ok(base)
 }
 
+fn get_path_str(path: &Path) -> &str {
+    path.to_str().unwrap_or("<invalid path>")
+}
+
 /// Creates a file only if it doesn't already exist and returns whether it was created or not.
-pub fn touch_file(path: &Path) -> io::Result<bool> {
+pub fn touch_file(path: &Path) -> Result<bool> {
     let exists = path.exists();
 
     if !exists {
-        File::create(path)?;
+        File::create(path)
+            .chain_err(|| format!("failed to create file {}", get_path_str(path)))?;
     }
 
     Ok(exists)
 }
 
-pub fn verify_local_file(path: &str) -> io::Result<PathBuf> {
+pub fn verify_local_file(path: &str) -> Result<PathBuf> {
     let path = local_path(path)?;
     touch_file(&path)?;
 
     Ok(path)
 }
 
-pub fn read_file(path: &Path) -> io::Result<String> {
-    let mut file   = File::open(path)?;
+pub fn read_file(path: &Path) -> Result<String> {
+    let mut file = File::open(path)
+        .chain_err(|| format!("failed to open file {}", get_path_str(path)))?;
+
     let mut buffer = String::new();
-    file.read_to_string(&mut buffer)?;
+
+    file.read_to_string(&mut buffer)
+        .chain_err(|| format!("failed to read file {}", get_path_str(path)))?;
 
     if buffer.len() > 0 {
         Ok(buffer)
     } else {
-        let path = path.to_str().ok_or(Error::new(
-                        ErrorKind::InvalidData,
-                        "util::read_file(): malformed path"))?;
-        
-        Err(Error::new(ErrorKind::InvalidData, format!("util::read_file(): {} is empty", path)))
+        bail!(ErrorKind::EmptyFile(get_path_str(path).to_string()));
     }
 }
 
@@ -58,60 +74,4 @@ macro_rules! try_opt {
             None    => return None,
         }
     }};
-}
-
-#[macro_use]
-pub mod error {
-    use std::error::Error;
-
-    #[derive(Debug)]
-    pub struct DetailedError {
-        pub err:  Box<Error>,
-        pub func: &'static str,
-        pub file: &'static str,
-        pub line: u32,
-    }
-
-    #[macro_export]
-    macro_rules! try_detailed {
-        ($func:path, $($arg:expr),*) => {{
-            match $func($($arg,)*) {
-                Ok(v) => v,
-                Err(err) => return Err(DetailedError {
-                    err:  err.into(),
-                    func: stringify!($func),
-                    file: file!(),
-                    line: line!(),
-                }),
-            }
-        }};
-
-        ($($token:tt)+) => {{
-            match $($token)+ {
-                Ok(v) => v,
-                Err(err) => return Err(DetailedError {
-                    err:  err.into(),
-                    // Concatting each token removes unnecessary spacing
-                    func: concat!($(stringify!($token),)+),
-                    file: file!(),
-                    line: line!(),
-                }),
-            }
-        }};
-    }
-
-    /// Displays the provided error with a notification and by writing it to the terminal
-    pub fn report(de: &DetailedError) {
-        let msg = format!("[{}:{} {}]\nerror: ",
-                    de.file,
-                    de.line,
-                    de.func);
-
-        println!("{}{:?}", msg, de.err);
-
-        match ::notification::create_error(&format!("{}{}", msg, de.err.description())) {
-            Ok(_)    => (),
-            Err(err) => println!("error creating error notification: {:?}", err),
-        }
-    }
 }

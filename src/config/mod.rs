@@ -1,6 +1,5 @@
 extern crate yaml_rust;
 
-use std::error::Error;
 use std::path::Path;
 use chrono::{Local, Datelike};
 use util;
@@ -8,6 +7,12 @@ use feed::Feed;
 use self::yaml_rust::{YamlLoader, Yaml};
 
 #[macro_use] mod macros;
+
+error_chain! {
+    links {
+        Util(util::Error, util::ErrorKind);
+    }
+}
 
 create_config_enum!(FeedIdent,
     Name(String)   => self,
@@ -128,8 +133,10 @@ impl Config {
     }
 }
 
-pub fn load_from_file(path: &Path) -> Result<Config, Box<Error>> {
-    let doc = YamlLoader::load_from_str(&util::read_file(path)?)?;
+pub fn load_from_file(path: &Path) -> Result<Config> {
+    let doc = YamlLoader::load_from_str(&util::read_file(path)?)
+        .chain_err(|| "failed to load config file")?;
+
     let doc = &doc[0]; // We don't care about multiple documents
 
     Ok(Config {

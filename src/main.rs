@@ -1,16 +1,22 @@
 extern crate chrono;
+#[macro_use] extern crate error_chain;
+
+#[cfg(windows)]
+#[macro_use]
+extern crate lazy_static;
 
 #[macro_use] mod util;
 mod config;
+mod error;
 mod feed;
 mod notification;
 
 use std::thread;
 use std::time::Duration;
 use std::collections::HashMap;
+use error::*;
 use feed::listeners::{self, AverageMap, ListenerData};
 use config::Config;
-use util::error::{self, DetailedError};
 use self::chrono::{UTC, Timelike};
 
 fn sort_feeds(config: &Config, feeds: &mut Vec<feed::Feed>) {
@@ -24,7 +30,7 @@ fn sort_feeds(config: &Config, feeds: &mut Vec<feed::Feed>) {
     });
 }
 
-fn show_feeds(feeds: &Vec<feed::Feed>, average_data: &AverageMap) -> Result<(), DetailedError> {
+fn show_feeds(feeds: &Vec<feed::Feed>, average_data: &AverageMap) -> Result<()> {
     #[cfg(unix)]
     let iter = feeds.iter().enumerate();
     #[cfg(windows)]
@@ -35,17 +41,17 @@ fn show_feeds(feeds: &Vec<feed::Feed>, average_data: &AverageMap) -> Result<(), 
                         .map(|avg| avg.get_average_delta(feed.listeners as f32) as i32)
                         .unwrap_or(0);
 
-        try_detailed!(notification::create_update,
+        notification::create_update(
             i as i32 + 1,
             feeds.len() as i32,
             &feed,
-            delta);
+            delta)?;
     }
 
     Ok(())
 }
 
-fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), DetailedError> {
+fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<()> {
     let feeds = feed::get_latest(&config)?;
     let hour  = UTC::now().hour() as usize;
 
@@ -94,18 +100,18 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<(), 
     Ok(())
 }
 
-fn start() -> Result<(), DetailedError> {
-    let config_path   = try_detailed!(util::verify_local_file, "config.yaml");
-    let averages_path = try_detailed!(util::verify_local_file, "averages.csv");
+fn start() -> Result<()> {
+    let config_path   = util::verify_local_file("config.yaml")?;
+    let averages_path = util::verify_local_file("averages.csv")?;
 
     let mut listeners = listeners::load_averages(&averages_path)
         .unwrap_or(HashMap::new());
 
     let mut perform_cycle = || {
-        let config = try_detailed!(config::load_from_file, &config_path);
+        let config = config::load_from_file(&config_path)?;
 
         perform_update(&config, &mut listeners)?;
-        try_detailed!(listeners::save_averages, &averages_path, &listeners);
+        listeners::save_averages(&averages_path, &listeners)?;
 
         Ok(config)
     };

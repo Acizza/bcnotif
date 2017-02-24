@@ -1,30 +1,46 @@
 extern crate select;
 
-use std::error::{self, Error};
-use std::fmt;
-use std::num;
 use feed::Feed;
-use util::error::DetailedError;
 use self::select::document::Document;
 use self::select::node::Node;
 use self::select::predicate::{Predicate, Name, Class};
 
-pub fn top_feeds(html: &str) -> Result<Vec<Feed>, DetailedError> {
+error_chain! {
+    errors {
+        TopFeeds {
+            description("top feed parse failed")
+            display("failed to parse top feeds")
+        }
+
+        StateFeeds {
+            description("state feed parse failed")
+            display("failed to parse state feeds")
+        }
+
+        ParseTop(reason: String) {
+            description("failed to parse top feeds")
+            display("failed to parse top feeds: {}", reason)
+        }
+    }
+}
+
+pub fn top_feeds(html: &str) -> Result<Vec<Feed>> {
     let doc = Document::from(strip_front(html, "<table class=\"btable", 1));
     let feed_data = doc.find(Class("btable").descendant(Name("tr")));
 
     let mut feeds = Vec::new();
 
     for feed in feed_data.skip(1) {
-        let (id, name) = try_detailed!(parse_id_and_name, &feed, "w100");
+        let (id, name) = parse_id_and_name(&feed, "w100")?;
 
         let (state_id, county) = {
             // The top 50 feed list allows multiple states and/or counties to appear,
             // so we can't assume their location
-            let hyperlinks = try_detailed!(feed
+
+            let hyperlinks = feed
                 .find(Name("td"))
                 .nth(1)
-                .ok_or("unable to get feed location links"));
+                .ok_or(ErrorKind::ParseTop("unable to get feed location links".to_string()))?;
 
             let mut hyperlinks = hyperlinks
                 .find(Name("a"))
@@ -32,11 +48,12 @@ pub fn top_feeds(html: &str) -> Result<Vec<Feed>, DetailedError> {
                     link.attr("href").map(|url| (url, link.text()))
                 });
 
-            let state_id = try_detailed!(hyperlinks
+            let state_id = hyperlinks
                 .next()
                 .and_then(|(link, _)| parse_link_id(&link))
-                .ok_or("unable to get feed state id".into())
-                .and_then(|id| id.parse().map_err(ParseError::from)));
+                .ok_or(ErrorKind::ParseTop("unable to get feed state id".to_string()))?
+                .parse()
+                .chain_err(|| ErrorKind::TopFeeds)?;
 
             let county = match hyperlinks.next() {
                 Some((link, ref text)) if link.starts_with("/listen/ctid") => {
@@ -53,7 +70,7 @@ pub fn top_feeds(html: &str) -> Result<Vec<Feed>, DetailedError> {
             state_id:  state_id,
             county:    county,
             name:      name,
-            listeners: try_detailed!(parse_listeners, &feed),
+            listeners: parse_listeners(&feed).chain_err(|| ErrorKind::TopFeeds)?,
             alert:     feed.find(Class("messageBox")).next().map(|alert| alert.text()),
         });
     }
@@ -61,14 +78,15 @@ pub fn top_feeds(html: &str) -> Result<Vec<Feed>, DetailedError> {
     Ok(feeds)
 }
 
-pub fn state_feeds(html: &str, state_id: u32) -> Result<Vec<Feed>, DetailedError> {
+pub fn state_feeds(html: &str, state_id: u32) -> Result<Vec<Feed>> {
     let doc = Document::from(strip_front(html, "<table class=\"btable", 2));
     let feed_data = doc.find(Class("btable").descendant(Name("tr")));
 
     let mut feeds = Vec::new();
 
     for feed in feed_data.skip(1) {
-        let (id, name) = try_detailed!(parse_id_and_name, &feed, "w1p");
+        let (id, name) = parse_id_and_name(&feed, "w1p")
+            .chain_err(|| ErrorKind::StateFeeds)?;
 
         let county = feed
             .find(Name("a"))
@@ -86,7 +104,7 @@ pub fn state_feeds(html: &str, state_id: u32) -> Result<Vec<Feed>, DetailedError
             state_id:  state_id,
             county:    county,
             name:      name,
-            listeners: try_detailed!(parse_listeners, &feed),
+            listeners: parse_listeners(&feed).chain_err(|| ErrorKind::StateFeeds)?,
             alert:     alert,
         });
     }
@@ -117,56 +135,30 @@ fn strip_front<'a>(string: &'a str, delim: &str, num_times: u32) -> &'a str {
     slice
 }
 
-fn parse_id_and_name(node: &Node, class_name: &str) -> Result<(u32, String), ParseError> {
+fn parse_id_and_name(node: &Node, class_name: &str) -> Result<(u32, String)> {
     let base = node
         .find(Class(class_name).descendant(Name("a")))
         .next()
-        .ok_or("unable to get base for feed id & name")?;
+        .ok_or("unable to find base class for feed id & name")?;
 
     let id = base
         .attr("href")
         .and_then(parse_link_id)
         .ok_or("unable to get feed id")?
-        .parse()?;
+        .parse()
+        .chain_err(|| "failed to parse state id")?;
 
     Ok((id, base.text()))
 }
 
-fn parse_listeners(node: &Node) -> Result<u32, ParseError> {
+fn parse_listeners(node: &Node) -> Result<u32> {
     let text =
         node.find(Class("c").and(Class("m")))
             .next()
             .map(|node| node.text())
             .ok_or("unable to get feed listeners")?;
 
-    Ok(text.trim_right().parse()?)
-}
-
-#[derive(Debug)]
-pub struct ParseError {
-    pub reason: String,
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "feed parsing error: {}", self.reason)
-    }
-}
-
-impl error::Error for ParseError {
-    fn description(&self) -> &str {
-        &self.reason
-    }
-}
-
-impl From<num::ParseIntError> for ParseError {
-    fn from(err: num::ParseIntError) -> ParseError {
-        ParseError { reason: err.description().to_string() }
-    }
-}
-
-impl<'a> From<&'a str> for ParseError {
-    fn from(err: &'a str) -> ParseError {
-        ParseError { reason: err.to_string() }
-    }
+    text.trim_right()
+        .parse()
+        .chain_err(|| "unable to parse feed listeners")
 }
