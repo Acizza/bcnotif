@@ -121,16 +121,15 @@ fn start() -> Result<()> {
             println!("updating");
         }
 
-        let update_time_sec =
-            match perform_cycle() {
-                Ok(config) => config.misc.update_time as u64,
-                Err(err) => {
-                    error::report(&err);
-                    config::Misc::default().update_time as u64
-                },
-            };
+        let update_time_sec = match perform_cycle() {
+            Ok(config) => config.misc.update_time * 60.,
+            Err(err) => {
+                error::report(&err);
+                config::Misc::default().update_time * 60.
+            },
+        };
 
-        thread::sleep(Duration::from_secs(update_time_sec * 60));
+        thread::sleep(Duration::from_secs(update_time_sec as u64));
     }
 }
 
