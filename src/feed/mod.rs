@@ -12,6 +12,13 @@ error_chain! {
     links {
         Parse(parse::Error, parse::ErrorKind);
     }
+
+    errors {
+        NoFeeds {
+            description("no feeds parsed")
+            display("no feeds were parsed")
+        }
+    }
 }
 
 enum FeedSource {
@@ -123,8 +130,12 @@ pub fn get_latest(config: &Config) -> Result<Vec<Feed>> {
         feeds.dedup();
     }
 
-    filter(&config, &mut feeds);
-    Ok(feeds)
+    if feeds.len() > 0 {
+        filter(&config, &mut feeds);
+        Ok(feeds)
+    } else {
+        bail!(ErrorKind::NoFeeds)
+    }    
 }
 
 fn download_feed_data(config: &Config, client: &Client, source: FeedSource) -> Result<String> {
