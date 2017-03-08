@@ -95,7 +95,10 @@ pub fn create_update(feed_idx: i32, max_feed_idx: i32, feed: &Feed, feed_delta: 
 
     create(
         Icon::Update,
-        &format!("Broadcastify Update ({} of {})", feed_idx, max_feed_idx),
+        &format!("{} - Broadcastify Update ({} of {})",
+            feed.get_state_abbrev().unwrap_or("UNK"),
+            feed_idx,
+            max_feed_idx),
         &format!("Name: {}\nListeners: {} (^{}){}\nLink: http://broadcastify.com/listen/feed/{}",
             feed.name,
             feed.listeners,
