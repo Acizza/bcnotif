@@ -10,7 +10,7 @@ use self::winapi::winuser::{WNDCLASSW, HWND_MESSAGE, WM_USER, WM_DESTROY};
 use self::winapi::minwindef::{DWORD, UINT, LRESULT, LPARAM, WPARAM};
 use self::winapi::windef::{HWND, HICON};
 use self::winapi::winnt::WCHAR;
-use self::winapi::{GUID, SW_HIDE};
+use self::winapi::GUID;
 
 const NIF_ICON:  UINT = 0x2;
 const NIF_TIP:   UINT = 0x4;
@@ -127,14 +127,4 @@ unsafe extern "system" fn window_proc(h_wnd: HWND, msg: UINT, w_param: WPARAM, l
     }
 
     user32::DefWindowProcW(h_wnd, msg, w_param, l_param)
-}
-
-pub fn close_console() {
-    unsafe {
-        let window = kernel32::GetConsoleWindow();
-
-        if !window.is_null() {
-            user32::ShowWindow(window, SW_HIDE);
-        }
-    }
 }

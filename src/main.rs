@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 extern crate chrono;
 #[macro_use] extern crate error_chain;
 
@@ -134,10 +136,6 @@ fn start() -> Result<()> {
 }
 
 fn main() {
-    // TODO: Remove when the windows subsystem (https://github.com/rust-lang/rfcs/blob/master/text/1665-windows-subsystem.md) is stable
-    #[cfg(windows)]
-    util::windows::close_console();
-
     match start() {
         Ok(_) => (),
         Err(err) => {
