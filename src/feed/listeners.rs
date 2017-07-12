@@ -6,7 +6,7 @@ use std::path::Path;
 use config::Config;
 use feed::Feed;
 use util::lerp;
-use self::chrono::{UTC, Timelike};
+use self::chrono::prelude::{Utc, Timelike};
 
 const MOVING_AVG_SIZE: usize = 5;
 
@@ -163,7 +163,7 @@ pub fn load_averages(path: &Path) -> Result<AverageMap> {
         .chain_err(|| "failed to open listener average file")?
         .has_headers(false);
 
-    let hour = UTC::now().hour() as usize;
+    let hour = Utc::now().hour() as usize;
 
     for record in reader.decode() {
         let (id, avg): (_, [_; 24]) = record.chain_err(|| "failed to decode listener average")?;

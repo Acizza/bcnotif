@@ -7,9 +7,9 @@ authors = ["Acizza <jonathanmce@gmail.com>"]
 show-feed-info = []
 
 [dependencies]
-hyper       = "0.10.*"
+reqwest     = "0.7.*"
 csv         = "0.15.*"
-chrono      = "0.3.*"
+chrono      = "0.4.*"
 yaml-rust   = "0.3.*"
 select      = { git = "https://github.com/utkarshkukreti/select.rs" }
 error-chain = "0.10.*"

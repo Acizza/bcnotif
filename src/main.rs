@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use error::*;
 use feed::listeners::{self, AverageMap, ListenerData};
 use config::Config;
-use self::chrono::{UTC, Timelike};
+use self::chrono::prelude::{Utc, Timelike};
 
 fn sort_feeds(config: &Config, feeds: &mut Vec<feed::Feed>) {
     use config::SortOrder::*;
@@ -53,7 +53,7 @@ fn show_feeds(feeds: &Vec<feed::Feed>, average_data: &AverageMap) -> Result<()> 
 
 fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<()> {
     let feeds = feed::get_latest(&config)?;
-    let hour  = UTC::now().hour() as usize;
+    let hour  = Utc::now().hour() as usize;
 
     let mut display_feeds = Vec::new();
 

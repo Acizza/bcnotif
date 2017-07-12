@@ -2,11 +2,10 @@ pub mod listeners;
 mod parse;
 
 extern crate csv;
-extern crate hyper;
+extern crate reqwest;
 
 use std::io::Read;
 use config::Config;
-use self::hyper::client::Client;
 
 error_chain! {
     links {
@@ -115,13 +114,12 @@ impl Feed {
 
 pub fn get_latest(config: &Config) -> Result<Vec<Feed>> {
     use self::FeedSource::*;
-    
-    let client = Client::new();
-    let mut feeds = parse::top_feeds(&download_feed_data(&config, &client, Top)?)?;
+
+    let mut feeds = parse::top_feeds(&download_feed_data(&config, Top)?)?;
 
     if let Some(id) = config.misc.state_feeds_id {
         feeds.extend(parse::state_feeds(
-            &download_feed_data(&config, &client, State(id))?,
+            &download_feed_data(&config, State(id))?,
             id)?
         );
         
@@ -138,13 +136,13 @@ pub fn get_latest(config: &Config) -> Result<Vec<Feed>> {
     }    
 }
 
-fn download_feed_data(config: &Config, client: &Client, source: FeedSource) -> Result<String> {
+fn download_feed_data(config: &Config, source: FeedSource) -> Result<String> {
     let url = match source {
         FeedSource::Top       => config.links.top_feeds.clone(),
         FeedSource::State(id) => format!("{}{}", &config.links.state_feeds, id),
     };
 
-    let mut resp = client.get(&url).send()
+    let mut resp = reqwest::get(&url)
         .chain_err(|| format!("failed to download feed data from {}", url))?;
 
     let mut body = String::new();
