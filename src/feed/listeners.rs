@@ -158,15 +158,18 @@ impl ListenerData {
 pub type AverageMap = HashMap<u32, ListenerData>;
 
 pub fn load_averages(path: &Path) -> Result<AverageMap> {
-    let mut avgs   = HashMap::new();
-    let mut reader = csv::Reader::from_file(path)
-        .chain_err(|| "failed to open listener average file")?
-        .has_headers(false);
+    let reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_path(path)
+        .chain_err(|| "failed to open listener average file")?;
 
+    let mut avgs = HashMap::new();
     let hour = Utc::now().hour() as usize;
 
-    for record in reader.decode() {
-        let (id, avg): (_, [_; 24]) = record.chain_err(|| "failed to decode listener average")?;
+    for record in reader.into_deserialize() {
+        let (id, avg): (_, [_; 24]) = record
+            .chain_err(|| "failed to decode listener average")?;
+
         avgs.insert(id, ListenerData::new(avg[hour], avg));
     }
 
@@ -174,16 +177,19 @@ pub fn load_averages(path: &Path) -> Result<AverageMap> {
 }
 
 pub fn save_averages(path: &Path, averages: &AverageMap) -> Result<()> {
-    let mut writer = csv::Writer::from_file(path)
+    let mut writer = csv::Writer::from_path(path)
         .chain_err(|| "failed to open listener average file")?;
     
     for (id, data) in averages {
-        let hourly = data.hourly
-            .iter()
-            .map(|&v| v as u32)
-            .collect::<Vec<_>>();
+        let mut record = Vec::with_capacity(data.hourly.len() + 1);
 
-        writer.encode((id, hourly))
+        record.push(id.to_string());
+
+        for hour_data in data.hourly.iter() {
+            record.push(hour_data.to_string());
+        }
+
+        writer.write_record(&record)
             .chain_err(|| "failed to encode listener average")?;
     }
 

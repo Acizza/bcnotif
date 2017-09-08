@@ -1,7 +1,6 @@
 pub mod listeners;
 mod parse;
 
-extern crate csv;
 extern crate reqwest;
 
 use std::io::Read;

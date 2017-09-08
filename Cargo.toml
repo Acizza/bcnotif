@@ -7,18 +7,18 @@ authors = ["Acizza <jonathanmce@gmail.com>"]
 show-feed-info = []
 
 [dependencies]
-reqwest     = "0.7.*"
-csv         = "0.15.*"
-chrono      = "0.4.*"
-yaml-rust   = "0.3.*"
+reqwest     = "0.7"
+csv         = "1.0.0-beta.4"
+chrono      = "0.4"
+yaml-rust   = "0.3"
 select      = "0.4"
-error-chain = "0.10.*"
+error-chain = "0.11"
 
 [target.'cfg(unix)'.dependencies]
-notify-rust = "3.*"
+notify-rust = "3"
 
 [target.'cfg(windows)'.dependencies]
-winapi       = "0.2.*"
-user32-sys   = "0.2.*"
-kernel32-sys = "0.2.*"
-lazy_static  = "0.2.*"
+winapi       = "0.2"
+user32-sys   = "0.2"
+kernel32-sys = "0.2"
+lazy_static  = "0.2"
