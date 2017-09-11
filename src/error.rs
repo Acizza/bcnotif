@@ -18,14 +18,18 @@ fn get_err_msg(err: &Error) -> String {
     format!("error: {}\n{}", err, causes)
 }
 
+fn print_backtrace(err: &Error) {
+    if let Some(backtrace) = err.backtrace() {
+        eprintln!("{:?}", backtrace);
+    }
+}
+
 /// Displays the provided error with a notification and by writing it to the terminal
 pub fn report(err: &Error) {
     let msg = get_err_msg(&err);
     eprintln!("{}", msg);
 
-    if let Some(backtrace) = err.backtrace() {
-        eprintln!("{:?}", backtrace);
-    }
+    print_backtrace(err);
 
     match ::notification::create_error(&msg) {
         Ok(_) => (),
@@ -33,9 +37,7 @@ pub fn report(err: &Error) {
             let err = err.into();
             eprintln!("failed to create error notification:\n{}", get_err_msg(&err));
 
-            if let Some(backtrace) = err.backtrace() {
-                eprintln!("{:?}", backtrace);
-            }
+            print_backtrace(&err);
         }
     }
 }
