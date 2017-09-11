@@ -21,20 +21,20 @@ fn get_err_msg(err: &Error) -> String {
 /// Displays the provided error with a notification and by writing it to the terminal
 pub fn report(err: &Error) {
     let msg = get_err_msg(&err);
-    println!("{}", msg);
+    eprintln!("{}", msg);
 
     if let Some(backtrace) = err.backtrace() {
-        println!("{:?}", backtrace);
+        eprintln!("{:?}", backtrace);
     }
 
     match ::notification::create_error(&msg) {
         Ok(_) => (),
         Err(err) => {
             let err = err.into();
-            println!("failed to create error notification:\n{}", get_err_msg(&err));
+            eprintln!("failed to create error notification:\n{}", get_err_msg(&err));
 
             if let Some(backtrace) = err.backtrace() {
-                println!("{:?}", backtrace);
+                eprintln!("{:?}", backtrace);
             }
         }
     }

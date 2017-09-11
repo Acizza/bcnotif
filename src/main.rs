@@ -139,7 +139,7 @@ fn main() {
     match start() {
         Ok(_) => (),
         Err(err) => {
-            println!("FATAL ERROR:");
+            eprintln!("FATAL ERROR:");
             error::report(&err);
         },
     }
