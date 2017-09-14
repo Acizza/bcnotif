@@ -8,8 +8,6 @@ use feed::Feed;
 use util::lerp;
 use self::chrono::prelude::{Utc, Timelike};
 
-const MOVING_AVG_SIZE: usize = 5;
-
 error_chain! {}
 
 #[derive(Debug)]
@@ -20,8 +18,10 @@ pub struct Average {
 }
 
 impl Average {
+    pub const MOVING_SIZE: usize = 5;
+
     pub fn new(average: f32) -> Average {
-        let mut moving = VecDeque::with_capacity(MOVING_AVG_SIZE + 1);
+        let mut moving = VecDeque::with_capacity(Average::MOVING_SIZE + 1);
         
         if average > 0. {
             moving.push_back(average);
@@ -37,7 +37,7 @@ impl Average {
     fn update(&mut self, value: f32) {
         self.moving.push_back(value);
 
-        if self.moving.len() > MOVING_AVG_SIZE {
+        if self.moving.len() > Average::MOVING_SIZE {
             self.moving.pop_front();
         }
 
