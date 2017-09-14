@@ -19,11 +19,6 @@ error_chain! {
     }
 }
 
-enum FeedSource {
-    Top,
-    State(u32),
-}
-
 #[derive(Debug)]
 pub struct Feed {
     pub id:        u32,
@@ -111,6 +106,20 @@ impl Feed {
     }
 }
 
+enum FeedSource {
+    Top,
+    State(u32),
+}
+
+impl FeedSource {
+    fn get_url(&self, config: &Config) -> String {
+        match *self {
+            FeedSource::Top       => config.links.top_feeds.clone(),
+            FeedSource::State(id) => format!("{}{}", config.links.state_feeds, id),
+        }
+    }
+}
+
 pub fn get_latest(config: &Config) -> Result<Vec<Feed>> {
     use self::FeedSource::*;
 
@@ -128,7 +137,7 @@ pub fn get_latest(config: &Config) -> Result<Vec<Feed>> {
     }
 
     if feeds.len() > 0 {
-        filter(&config, &mut feeds);
+        filter_whitelist_blacklist(&config, &mut feeds);
         Ok(feeds)
     } else {
         bail!(ErrorKind::NoFeeds)
@@ -136,10 +145,7 @@ pub fn get_latest(config: &Config) -> Result<Vec<Feed>> {
 }
 
 fn download_feed_data(config: &Config, source: FeedSource) -> Result<String> {
-    let url = match source {
-        FeedSource::Top       => config.links.top_feeds.clone(),
-        FeedSource::State(id) => format!("{}{}", &config.links.state_feeds, id),
-    };
+    let url = source.get_url(config);
 
     let mut resp = reqwest::get(&url)
         .chain_err(|| format!("failed to download feed data from {}", url))?;
@@ -152,7 +158,7 @@ fn download_feed_data(config: &Config, source: FeedSource) -> Result<String> {
     Ok(body)
 }
 
-fn filter(config: &Config, feeds: &mut Vec<Feed>) {
+fn filter_whitelist_blacklist(config: &Config, feeds: &mut Vec<Feed>) {
     if config.whitelist.len() > 0 {
         feeds.retain(|ref feed| {
             config.whitelist

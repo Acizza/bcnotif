@@ -55,7 +55,11 @@ pub struct ListenerData {
 }
 
 impl ListenerData {
-    pub fn new(listeners: f32, hourly: [f32; 24]) -> ListenerData {
+    pub fn new(listeners: f32) -> ListenerData {
+        ListenerData::with_hourly_data(listeners, [0.0; 24])
+    }
+
+    pub fn with_hourly_data(listeners: f32, hourly: [f32; 24]) -> ListenerData {
         ListenerData {
             average:      Average::new(listeners),
             unskewed_avg: None,
@@ -170,7 +174,7 @@ pub fn load_averages(path: &Path) -> Result<AverageMap> {
         let (id, avg): (_, [_; 24]) = record
             .chain_err(|| "failed to decode listener average")?;
 
-        avgs.insert(id, ListenerData::new(avg[hour], avg));
+        avgs.insert(id, ListenerData::with_hourly_data(avg[hour], avg));
     }
 
     Ok(avgs)

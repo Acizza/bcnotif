@@ -64,6 +64,8 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<()> 
             continue
         }
 
+        // TODO: Print debug information in a way that doesn't require certain information
+        // to be in specific positions
         if cfg!(feature = "show-feed-info") {
             print!("{:?}\n^", feed);
         }
@@ -73,7 +75,7 @@ fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<()> 
         let listener_data =
             average_data
             .entry(feed.id)
-            .or_insert(ListenerData::new(listeners, [0.; 24]));
+            .or_insert(ListenerData::new(listeners));
 
         let has_spiked = listener_data.step(&config, hour, &feed);
 
@@ -124,10 +126,10 @@ fn start() -> Result<()> {
         }
 
         let update_time_sec = match perform_cycle() {
-            Ok(config) => config.misc.update_time * 60.,
+            Ok(config) => config.misc.update_time * 60.0,
             Err(err) => {
                 error::report(&err);
-                config::Misc::default().update_time * 60.
+                config::Misc::default().update_time * 60.0
             },
         };
 
