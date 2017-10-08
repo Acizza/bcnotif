@@ -1,18 +1,35 @@
 extern crate yaml_rust;
 
-use std::path::Path;
+#[macro_use] mod generation;
+
 use chrono::{Local, Datelike};
-use util;
 use feed::Feed;
 use self::yaml_rust::{YamlLoader, Yaml};
-
-#[macro_use] mod macros;
+use std::path::Path;
 
 error_chain! {
     links {
-        Util(util::Error, util::ErrorKind);
+        Util(::util::Error, ::util::ErrorKind);
+    }
+
+    foreign_links {
+        Yaml(yaml_rust::ScanError);
     }
 }
+
+create_config_struct!(Spike,
+    jump:                    f32 => "Jump Required"                        => 0.25,
+    low_listener_increase:   f32 => "Low Listener Increase"                => [0.0, 0.005],
+    high_listener_dec:       f32 => "High Listener Decrease"               => [0.0, 0.02],
+    high_listener_dec_every: f32 => "High Listener Decrease Per Listeners" => [1.0, 100.0],
+);
+
+create_config_struct!(UnskewedAverage,
+    reset_pcnt:      f32 => "Reset To Average Percentage"  => [0.0, 0.15],
+    adjust_pcnt:     f32 => "Adjust to Average Percentage" => [0.0, 0.0075],
+    spikes_required: u8  => "Listener Spikes Required"     => 1,
+    jump_required:   f32 => "Listener Jump Required"       => [1.1, 4.0],
+);
 
 create_config_enum!(FeedIdent,
     Name(String)   => self,
@@ -23,21 +40,14 @@ create_config_enum!(FeedIdent,
 
 impl FeedIdent {
     pub fn matches_feed(&self, feed: &Feed) -> bool {
-        use self::FeedIdent::*;
-
         match *self {
-            Name(ref name) => *name == feed.name,
-            ID(id)         => id == feed.id,
-            County(ref c)  => *c == feed.county,
-            State(id)      => id == feed.state_id,
+            FeedIdent::Name(ref name) => *name == feed.name,
+            FeedIdent::ID(id)         => id == feed.id,
+            FeedIdent::County(ref c)  => *c == feed.county,
+            FeedIdent::State(id)      => id == feed.state_id,
         }
     }
 }
-
-create_config_enum!(SortOrder,
-    Ascending  => self,
-    Descending => self,
-);
 
 create_config_enum!(WeekdaySpike,
     Sunday(Spike)    => self,
@@ -73,24 +83,10 @@ impl WeekdaySpike {
     }
 }
 
-create_config_struct!(Spike,
-    jump:                    f32 => "Jump Required"                        => 0.25,
-    low_listener_increase:   f32 => "Low Listener Increase"                => [0.0, 0.005],
-    high_listener_dec:       f32 => "High Listener Decrease"               => [0.0, 0.02],
-    high_listener_dec_every: f32 => "High Listener Decrease Per Listeners" => [1.0, 100.0],
-);
-
 create_config_struct!(FeedSetting,
-    ident:         FeedIdent         => self                        => fail,
-    spike:         Spike             => "Spike Percentages"         => default,
-    weekday_spike: Vec<WeekdaySpike> => "Weekday Spike Percentages" => all,
-);
-
-create_config_struct!(UnskewedAverage,
-    reset_pcnt:      f32 => "Reset To Average Percentage"  => [0.0, 0.15],
-    adjust_pcnt:     f32 => "Adjust to Average Percentage" => [0.0, 0.0075],
-    spikes_required: u8  => "Listener Spikes Required"     => 1,
-    jump_required:   f32 => "Listener Jump Required"       => [1.1, 4.0],
+    ident:          FeedIdent         => self                        => fail,
+    spike:          Spike             => "Spike Percentages"         => default,
+    weekday_spikes: Vec<WeekdaySpike> => "Weekday Spike Percentages" => all,
 );
 
 create_config_struct!(Misc,
@@ -100,56 +96,71 @@ create_config_struct!(Misc,
     sort_order:        SortOrder   => "Feed Sort Order"   => (SortOrder::Descending),
 );
 
-create_config_struct!(Links,
-    top_feeds:   String => "Top Feeds"   => ("http://broadcastify.com/listen/top".to_string()),
-    state_feeds: String => "State Feeds" => ("http://www.broadcastify.com/listen/stid/".to_string()),
+create_config_enum!(SortOrder,
+    Ascending  => self,
+    Descending => self,
 );
 
-#[derive(Debug)]
-pub struct Config {
-    pub unskewed_avg: UnskewedAverage,
-    pub misc:         Misc,
-    pub links:        Links,
-    pub blacklist:    Vec<FeedIdent>,
-    pub whitelist:    Vec<FeedIdent>,
-    global_spike:     Spike,
-    weekday_spikes:   Vec<WeekdaySpike>,
-    feed_settings:    Vec<FeedSetting>,
+macro_rules! gen_base_parse_stmt {
+    (optional, $category:expr, $doc:ident) => (ParseYaml::from(&$doc[$category]));
+    (default,  $category:expr, $doc:ident) => (ParseYaml::from_or_default(&$doc[$category]));
+    (all,      $category:expr, $doc:ident) => (ParseYaml::all(&$doc[$category]));
 }
+
+macro_rules! gen_base_config {
+    ($name:ident, $($field:ident: $type:ty => $parse_type:ident => $category:expr,)+) => {
+        #[derive(Debug, Default)]
+        pub struct $name {
+            $(pub $field: $type,)+
+        }
+
+        impl $name {
+            pub fn from_file(path: &Path) -> Result<$name> {
+                let file = ::util::read_file(path)?;
+
+                if file.len() == 0 {
+                    return Ok(Config::default())
+                }
+
+                let doc = YamlLoader::load_from_str(&::util::read_file(path)?)?;
+                let doc = &doc[0]; // We only care about the first document
+
+                Ok($name {
+                    $($field: gen_base_parse_stmt!($parse_type, $category, doc),)+
+                })
+            }
+        }
+    };
+}
+
+gen_base_config!(Config,
+    global_spike:   Spike             => default => "Spike Percentage",
+    unskewed_avg:   UnskewedAverage   => default => "Unskewed Average",
+    weekday_spikes: Vec<WeekdaySpike> => all     => "Weekday Spike Percentages",
+    feed_settings:  Vec<FeedSetting>  => all     => "Feed Settings",
+    misc:           Misc              => default => "Misc",
+    blacklist:      Vec<FeedIdent>    => all     => "Blacklist",
+    whitelist:      Vec<FeedIdent>    => all     => "Whitelist",
+);
 
 impl Config {
-    pub fn get_current_spike(&self, feed: &Feed) -> &Spike {
-        self.feed_settings
+    pub fn get_feed_spike(&self, feed: &Feed) -> &Spike {
+        // Find any settings for the specified feed
+        let feed_setting = self.feed_settings
             .iter()
-            .find(|setting| setting.ident.matches_feed(&feed))
-            .map(|setting| {
-                WeekdaySpike::get_for_today(&setting.weekday_spike)
+            .find(|s| s.ident.matches_feed(&feed));
+
+        match feed_setting {
+            Some(setting) => {
+                WeekdaySpike::get_for_today(&setting.weekday_spikes)
                     .unwrap_or(&setting.spike)
-            })
-            .unwrap_or({
+            },
+            None => {
                 WeekdaySpike::get_for_today(&self.weekday_spikes)
                     .unwrap_or(&self.global_spike)
-            })
+            }
+        }
     }
-}
-
-pub fn load_from_file(path: &Path) -> Result<Config> {
-    let doc = YamlLoader::load_from_str(&util::read_file(path)?)
-        .chain_err(|| "failed to load config file")?;
-
-    let doc = &doc[0]; // We don't care about multiple documents
-
-    Ok(Config {
-        unskewed_avg:   ParseYaml::from_or_default(&doc["Unskewed Average"]),
-        misc:           ParseYaml::from_or_default(&doc["Misc"]),
-        links:          ParseYaml::from_or_default(&doc["Source Links"]),
-        blacklist:      ParseYaml::all(&doc["Blacklist"]),
-        whitelist:      ParseYaml::all(&doc["Whitelist"]),
-        global_spike:   ParseYaml::from_or_default(&doc["Spike Percentages"]),
-        weekday_spikes: ParseYaml::all(&doc["Weekday Spike Percentages"]),
-        feed_settings:  ParseYaml::all(&doc["Feed Settings"]),
-
-    })
 }
 
 trait ParseYaml: Sized + Default {
@@ -161,10 +172,10 @@ trait ParseYaml: Sized + Default {
 
     fn all(doc: &Yaml) -> Vec<Self> {
         doc.as_vec()
-            .unwrap_or(&Vec::new())
-            .iter()
-            .filter_map(ParseYaml::from)
-            .collect()
+           .unwrap_or(&Vec::new())
+           .iter()
+           .filter_map(ParseYaml::from)
+           .collect()
     }
 }
 

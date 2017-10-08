@@ -4,21 +4,15 @@ version = "0.9.0"
 authors = ["Acizza <jonathanmce@gmail.com>"]
 
 [features]
-show-feed-info = []
+print-feed-data = []
 
 [dependencies]
-reqwest     = "0.7"
-csv         = "1.0.0-beta.4"
-chrono      = "0.4"
-yaml-rust   = "0.3"
-select      = "0.4"
 error-chain = "0.11"
+chrono      = "0.4"
+csv         = "1.0.0-beta.4"
+select      = "0.4"
+reqwest     = "0.8"
+yaml-rust   = "0.3"
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(any(unix, macos))'.dependencies]
 notify-rust = "3"
-
-[target.'cfg(windows)'.dependencies]
-winapi       = "0.2"
-user32-sys   = "0.2"
-kernel32-sys = "0.2"
-lazy_static  = "0.2"

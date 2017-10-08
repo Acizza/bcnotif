@@ -28,7 +28,7 @@ macro_rules! gen_struct_value {
 
     // Value with no display name that exits early on failure
     ($parent:expr, self, fail) => {{
-        try_opt!(ParseYaml::from(&$parent))
+        ParseYaml::from(&$parent)?
     }};
 
     // Value with no display name
@@ -38,7 +38,7 @@ macro_rules! gen_struct_value {
 
     // Value that exits early on failure
     ($parent:expr, $disp_name:expr, fail) => {{
-        try_opt!(ParseYaml::from(&$parent[$disp_name]))
+        ParseYaml::from(&$parent[$disp_name])?
     }};
 
     // Array
@@ -101,16 +101,18 @@ macro_rules! create_config_enum {
 
         impl ParseYaml for $name {
             fn from(doc: &Yaml) -> Option<$name> {
+                let mut elem;
+
                 $(
-                let elem = &doc[get_enum_field_name!($field, $disp_name)];
+                elem = &doc[get_enum_field_name!($field, $disp_name)];
 
                 if !elem.is_badvalue() {
-                    match ParseYaml::from(elem) {
-                        Some(v) => return Some($name::$field(v)),
-                        None    => (),
+                    if let Some(v) = ParseYaml::from(elem) {
+                        return Some($name::$field(v));
                     }
                 }
                 )+
+                
                 None
             }
         }

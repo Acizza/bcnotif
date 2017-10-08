@@ -1,20 +1,28 @@
-pub mod listeners;
-mod parse;
-
 extern crate reqwest;
 
-use std::io::Read;
+pub mod statistics;
+mod scrape;
+
 use config::Config;
+use std::io::Read;
 
 error_chain! {
     links {
-        Parse(parse::Error, parse::ErrorKind);
+        Scrape(self::scrape::Error, self::scrape::ErrorKind);
+    }
+
+    foreign_links {
+        Reqwest(reqwest::Error);
+        Io(::std::io::Error);
     }
 
     errors {
-        NoFeeds {
-            description("no feeds parsed")
-            display("no feeds were parsed")
+        TopFeeds {
+            display("failed to parse top feeds")
+        }
+
+        StateFeeds {
+            display("failed to parse state feeds")
         }
     }
 }
@@ -22,21 +30,35 @@ error_chain! {
 #[derive(Debug)]
 pub struct Feed {
     pub id:        u32,
-    pub state_id:  u32,
-    pub county:    String,
     pub name:      String,
     pub listeners: u32,
+    pub state_id:  u32,
+    pub county:    String,
     pub alert:     Option<String>,
 }
 
-impl PartialEq for Feed {
-    fn eq(&self, other: &Feed) -> bool {
-        self.id == other.id
-    }
-}
-
 impl Feed {
-    // TODO: Parse states from website (?)
+    pub fn download_and_scrape(config: &Config) -> Result<Vec<Feed>> {
+        let client = reqwest::Client::new();
+
+        let mut feeds = FeedSource::Top.download_and_scrape(&client)?;
+
+        if let Some(state_id) = config.misc.state_feeds_id {
+            let state_feeds = FeedSource::State(state_id)
+                .download_and_scrape(&client)?;
+
+            feeds.extend(state_feeds);
+        }
+
+        filter_whitelist_blacklist(config, &mut feeds);
+
+        feeds.sort_by_key(|feed| feed.id);
+        feeds.dedup();
+
+        Ok(feeds)
+    }
+
+    // TODO: parse states from website (?)
     pub fn get_state_abbrev(&self) -> Option<&str> {
         macro_rules! create_matches {
             ($($id:expr => $abbrev:expr,)+) => {
@@ -106,56 +128,10 @@ impl Feed {
     }
 }
 
-enum FeedSource {
-    Top,
-    State(u32),
-}
-
-impl FeedSource {
-    fn get_url(&self, config: &Config) -> String {
-        match *self {
-            FeedSource::Top       => config.links.top_feeds.clone(),
-            FeedSource::State(id) => format!("{}{}", config.links.state_feeds, id),
-        }
+impl PartialEq for Feed {
+    fn eq(&self, other: &Feed) -> bool {
+        self.id == other.id
     }
-}
-
-pub fn get_latest(config: &Config) -> Result<Vec<Feed>> {
-    use self::FeedSource::*;
-
-    let mut feeds = parse::top_feeds(&download_feed_data(&config, Top)?)?;
-
-    if let Some(id) = config.misc.state_feeds_id {
-        feeds.extend(parse::state_feeds(
-            &download_feed_data(&config, State(id))?,
-            id)?
-        );
-        
-        // Remove any state feeds that show up in the top 50 list
-        feeds.sort_by_key(|f| f.id);
-        feeds.dedup();
-    }
-
-    if feeds.len() > 0 {
-        filter_whitelist_blacklist(&config, &mut feeds);
-        Ok(feeds)
-    } else {
-        bail!(ErrorKind::NoFeeds)
-    }    
-}
-
-fn download_feed_data(config: &Config, source: FeedSource) -> Result<String> {
-    let url = source.get_url(config);
-
-    let mut resp = reqwest::get(&url)
-        .chain_err(|| format!("failed to download feed data from {}", url))?;
-
-    let mut body = String::new();
-
-    resp.read_to_string(&mut body)
-        .chain_err(|| format!("failed to read feed data into string from {}", url))?;
-
-    Ok(body)
 }
 
 fn filter_whitelist_blacklist(config: &Config, feeds: &mut Vec<Feed>) {
@@ -173,5 +149,50 @@ fn filter_whitelist_blacklist(config: &Config, feeds: &mut Vec<Feed>) {
                 .iter()
                 .any(|entry| !entry.matches_feed(&feed))
         });
+    }
+}
+
+enum FeedSource {
+    Top,
+    State(u32),
+}
+
+impl FeedSource {
+    fn get_url(&self) -> String {
+        match *self {
+            FeedSource::Top => "http://broadcastify.com/listen/top".into(),
+            FeedSource::State(id) => format!("http://broadcastify.com/listen/stid/{}", id),
+        }
+    }
+
+    fn download_page(&self, client: &reqwest::Client) -> Result<String> {
+        let mut resp = client.get(&self.get_url()).send()?;
+        let mut body = String::new();
+
+        resp.read_to_string(&mut body)?;
+        
+        Ok(body)
+    }
+
+    fn scrape(&self, body: &str) -> Result<Vec<Feed>> {
+        match *self {
+            FeedSource::Top => {
+                let scraped = scrape::scrape_top(&body)
+                    .chain_err(|| ErrorKind::TopFeeds)?;
+
+                Ok(scraped)
+            },
+            FeedSource::State(id) => {
+                let scraped = scrape::scrape_state(id, &body)
+                    .chain_err(|| ErrorKind::StateFeeds)?;
+
+                Ok(scraped)
+            },
+        }
+    }
+
+    fn download_and_scrape(&self, client: &reqwest::Client) -> Result<Vec<Feed>> {
+        let body = self.download_page(client)?;
+        self.scrape(&body)
     }
 }

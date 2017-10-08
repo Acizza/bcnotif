@@ -1,148 +1,127 @@
-#![windows_subsystem = "windows"]
-
-extern crate chrono;
 #[macro_use] extern crate error_chain;
-
-#[cfg(windows)]
-#[macro_use]
-extern crate lazy_static;
+extern crate chrono;
 
 #[macro_use] mod util;
 mod config;
 mod error;
 mod feed;
-mod notification;
+mod math;
+mod notify;
 
-use std::thread;
-use std::time::Duration;
-use std::collections::HashMap;
-use error::*;
-use feed::listeners::{self, AverageMap, ListenerData};
 use config::Config;
-use self::chrono::prelude::{Utc, Timelike};
+use chrono::{Utc, Timelike};
+use feed::Feed;
+use feed::statistics::{AverageData, ListenerStats};
+use std::time::Duration;
+use std::path::{Path, PathBuf};
 
-fn sort_feeds(config: &Config, feeds: &mut Vec<feed::Feed>) {
-    use config::SortOrder::*;
-
-    feeds.sort_by(|x, y| {
-        match config.misc.sort_order {
-            Ascending  => x.listeners.cmp(&y.listeners),
-            Descending => y.listeners.cmp(&x.listeners),
-        }
-    });
-}
-
-fn show_feeds(feeds: &Vec<feed::Feed>, average_data: &AverageMap) -> Result<()> {
-    #[cfg(unix)]
-    let iter = feeds.iter().enumerate();
-    #[cfg(windows)]
-    let iter = feeds.iter().enumerate().rev();
-
-    for (i, feed) in iter {
-        let delta = average_data.get(&feed.id)
-                        .map(|avg| avg.get_average_delta(feed.listeners as f32) as i32)
-                        .unwrap_or(0);
-
-        notification::create_update(
-            i as i32 + 1,
-            feeds.len() as i32,
-            &feed,
-            delta)?;
+error_chain! {
+    links {
+        Config(config::Error, config::ErrorKind);
+        Feed(feed::Error, feed::ErrorKind);
+        Statistics(feed::statistics::Error, feed::statistics::ErrorKind);
+        Notify(notify::Error, notify::ErrorKind);
     }
 
-    Ok(())
-}
-
-fn perform_update(config: &Config, average_data: &mut AverageMap) -> Result<()> {
-    let feeds = feed::get_latest(&config)?;
-    let hour  = Utc::now().hour() as usize;
-
-    let mut display_feeds = Vec::new();
-
-    for feed in feeds {
-        if feed.listeners < config.misc.minimum_listeners {
-            continue
-        }
-
-        // TODO: Print debug information in a way that doesn't require certain information
-        // to be in specific positions
-        if cfg!(feature = "show-feed-info") {
-            print!("{:?}\n^", feed);
-        }
-
-        let listeners = feed.listeners as f32;
-
-        let listener_data =
-            average_data
-            .entry(feed.id)
-            .or_insert(ListenerData::new(listeners));
-
-        let has_spiked = listener_data.step(&config, hour, &feed);
-
-        if has_spiked || feed.alert.is_some() {
-            display_feeds.push(feed);
-        }
-
-        if cfg!(feature = "show-feed-info") {
-            print!(" {:?} UNS: {:?}",
-                listener_data.average,
-                listener_data.unskewed_avg);
-
-            if has_spiked {
-                print!(" !!! SPIKED");
-            }
-
-            print!("\n\n");
-        }
-    }
-
-    if display_feeds.len() > 0 {
-        sort_feeds(&config, &mut display_feeds);
-        show_feeds(&display_feeds, &average_data)?;
-    }
-
-    Ok(())
-}
-
-fn start() -> Result<()> {
-    let config_path   = util::verify_local_file("config.yaml")?;
-    let averages_path = util::verify_local_file("averages.csv")?;
-
-    let mut listeners = listeners::load_averages(&averages_path)
-        .unwrap_or(HashMap::new());
-
-    let mut perform_cycle = || {
-        let config = config::load_from_file(&config_path)?;
-
-        perform_update(&config, &mut listeners)?;
-        listeners::save_averages(&averages_path, &listeners)?;
-
-        Ok(config)
-    };
-
-    loop {
-        if cfg!(feature = "show-feed-info") {
-            println!("updating");
-        }
-
-        let update_time_sec = match perform_cycle() {
-            Ok(config) => config.misc.update_time * 60.0,
-            Err(err) => {
-                error::report(&err);
-                config::Misc::default().update_time * 60.0
-            },
-        };
-
-        thread::sleep(Duration::from_secs(update_time_sec as u64));
+    foreign_links {
+        Io(std::io::Error);
     }
 }
 
 fn main() {
     match start() {
         Ok(_) => (),
-        Err(err) => {
-            eprintln!("FATAL ERROR:");
-            error::report(&err);
-        },
+        Err(err) => eprintln!("fatal error: {:?}", err),
     }
+}
+
+fn start() -> Result<()> {
+    let exe_dir = get_exe_directory()?;
+    let config_path = exe_dir.clone().join("config.yaml");
+
+    let mut averages = AverageData::new(exe_dir.join("averages.csv"));
+
+    if averages.path.exists() {
+        averages.load()?;
+    }
+
+    loop {
+        match perform_update(&mut averages, &config_path) {
+            Ok(_) => (),
+            Err(err) => error::display(&err),
+        }
+
+        std::thread::sleep(Duration::from_secs(5 * 60));
+    }
+}
+
+fn perform_update(averages: &mut AverageData, config_path: &Path) -> Result<()> {
+    let config = Config::from_file(config_path)?;
+    let hour = Utc::now().hour();
+
+    let mut display_feeds = Vec::new();
+
+    for feed in Feed::download_and_scrape(&config)? {
+        if feed.listeners < config.misc.minimum_listeners {
+            continue
+        }
+
+        let stats = update_feed_stats(hour, &feed, &config, averages);
+
+        if cfg!(feature = "print-feed-data") {
+            print_info(&feed, &stats);
+        }
+
+        if stats.has_spiked || feed.alert.is_some() {
+            display_feeds.push((feed, stats.clone()));
+        }
+    }
+
+    show_feeds(display_feeds)?;
+
+    averages.save()?;
+    Ok(())
+}
+
+fn update_feed_stats<'a>(hour: u32, feed: &Feed, config: &Config, averages: &'a mut AverageData)
+    -> &'a ListenerStats {
+
+    let stats = averages.data
+        .entry(feed.id)
+        .or_insert(ListenerStats::new());
+
+    stats.update(hour as usize, feed, &config);
+    stats
+}
+
+fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>) -> Result<()> {
+    feeds.sort_by_key(|&(ref f, _)| f.listeners);
+
+    let total = feeds.len() as i32;
+
+    for (i, (feed, stats)) in feeds.into_iter().enumerate() {
+        notify::create_update(1 + i as i32, total, &feed, &stats)?;
+    }
+
+    Ok(())
+}
+
+fn print_info(feed: &Feed, stats: &ListenerStats) {
+    println!("[{}] {}", feed.id, feed.name);
+    println!("\tlisteners    | {}", feed.listeners);
+
+    println!("\taverage lis. | cur: {} last: {} samples: {:?}",
+        stats.average.current,
+        stats.average.last,
+        stats.average.data);
+
+    println!("\tunskewed avg | {:?}", stats.unskewed_average);
+    println!("\thas spiked   | {}", stats.has_spiked);
+    println!("\ttimes spiked | {}", stats.spike_count);
+}
+
+fn get_exe_directory() -> Result<PathBuf> {
+    let mut path = std::env::current_exe()?;
+    path.pop();
+    Ok(path)
 }
