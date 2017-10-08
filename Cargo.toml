@@ -16,3 +16,7 @@ yaml-rust   = "0.3"
 
 [target.'cfg(any(unix, macos))'.dependencies]
 notify-rust = "3"
+
+[target.'cfg(windows)'.dependencies.winrt]
+version = "0.3"
+features = ["windows-data", "windows-ui"]

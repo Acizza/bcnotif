@@ -42,8 +42,56 @@ mod unix {
     }
 }
 
+#[cfg(windows)]
+mod windows {
+    use ::winrt::FastHString;
+    use ::winrt::windows::data::xml::dom::*;
+    use ::winrt::windows::ui::notifications::*;
+    use super::Icon;
+
+    // The purpose of having an inner create function is so that we only have to specify the error type
+    // once if creation fails
+    fn inner_create(title: &str, body: &str) -> Result<(), ::winrt::Error> {
+        unsafe {
+            let toast_xml = ToastNotificationManager::get_template_content(ToastTemplateType_ToastText02)?;
+            let toast_text_elements = toast_xml.get_elements_by_tag_name(&FastHString::new("text"))?;
+
+            let add_text = |i, string| {
+                let node = &*toast_xml.create_text_node(&FastHString::new(string))?
+                    .query_interface::<IXmlNode>()
+                    .unwrap();
+
+                toast_text_elements
+                    .item(i)?
+                    .append_child(node)
+            };
+
+            add_text(0, title)?;
+            add_text(1, body)?;
+
+            let toast = ToastNotification::create_toast_notification(&*toast_xml)?;
+            let id = env!("CARGO_PKG_NAME");
+
+            ToastNotificationManager::create_toast_notifier_with_id(&FastHString::new(id))?
+                .show(&*toast)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn create(_: Icon, title: &str, body: &str) -> super::Result<()> {
+        inner_create(title, body)
+            .map_err(|err| format!("{:?}", err))?;
+
+        Ok(())
+    }
+}
+
 #[cfg(any(unix, macos))]
 use self::unix::create;
+
+#[cfg(windows)]
+use self::windows::create;
 
 pub fn create_update(index: i32, max_index: i32, feed: &Feed,
     feed_stats: &ListenerStats) -> Result<()> {

@@ -1,4 +1,7 @@
-#[macro_use] extern crate error_chain;
+#![windows_subsystem(windows)]
+
+#[cfg(windows)] extern crate winrt;
+#[macro_use]    extern crate error_chain;
 extern crate chrono;
 
 #[macro_use] mod util;
@@ -29,10 +32,16 @@ error_chain! {
 }
 
 fn main() {
+    #[cfg(windows)]
+    let rt = winrt::RuntimeContext::init();
+
     match start() {
         Ok(_) => (),
         Err(err) => eprintln!("fatal error: {:?}", err),
     }
+
+    #[cfg(windows)]
+    rt.uninit();
 }
 
 fn start() -> Result<()> {
