@@ -16,7 +16,7 @@ use chrono::{Utc, Timelike};
 use feed::Feed;
 use feed::statistics::{AverageData, ListenerStats};
 use std::time::Duration;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 error_chain! {
     links {
@@ -55,19 +55,19 @@ fn start() -> Result<()> {
     }
 
     loop {
-        match perform_update(&mut averages, &config_path) {
+        let config = Config::from_file(&config_path)?;
+
+        match perform_update(&mut averages, &config) {
             Ok(_) => (),
             Err(err) => error::display(&err),
         }
 
-        std::thread::sleep(Duration::from_secs(5 * 60));
+        std::thread::sleep(Duration::from_secs((config.misc.update_time * 60.0) as u64));
     }
 }
 
-fn perform_update(averages: &mut AverageData, config_path: &Path) -> Result<()> {
-    let config = Config::from_file(config_path)?;
+fn perform_update(averages: &mut AverageData, config: &Config) -> Result<()> {
     let hour = Utc::now().hour();
-
     let mut display_feeds = Vec::new();
 
     for feed in Feed::download_and_scrape(&config)? {
