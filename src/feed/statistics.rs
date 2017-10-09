@@ -23,9 +23,14 @@ error_chain! {
     }
 }
 
+type FeedID = u32;
+
+/// An interface to save and load ListenerStats data.
 pub struct AverageData {
+    /// The path to the file to save and load data from.
     pub path: PathBuf,
-    pub data: HashMap<u32, ListenerStats>,
+    /// The data to save and load.
+    pub data: HashMap<FeedID, ListenerStats>,
 }
 
 impl AverageData {
@@ -47,7 +52,7 @@ impl AverageData {
                 bail!(ErrorKind::TooFewRows);
             }
 
-            let id = record[0].parse::<u32>()?;
+            let id = record[0].parse()?;
             let mut averages = [0.0; ListenerStats::HOURLY_SIZE];
 
             for i in 0..ListenerStats::HOURLY_SIZE {
@@ -82,13 +87,21 @@ impl AverageData {
     }
 }
 
+/// Represents an average set of data that wraps around its specified sample size.
 #[derive(Debug, Clone)]
 pub struct Average {
+    /// The current average. It is updated after calling to self.add_sample().
     pub current: f32,
-    pub last:    f32,
-    pub data:    Vec<i32>,
-    index:       usize,
-    populated:   usize,
+    /// The current average before the last call to self.add_sample().
+    pub last: f32,
+    /// The raw data that is used to calculate the current and last average.
+    pub data: Vec<i32>,
+    /// The current data index.
+    index: usize,
+    /// This keeps track of how many samples have been added since the struct
+    /// was created, up until it reaches the specified sample size.
+    /// It prevents data values that haven't been added from being averaged.
+    populated: usize,
 }
 
 impl Average {
@@ -102,6 +115,7 @@ impl Average {
         }
     }
 
+    /// Creates a new Average with one initial sample.
     pub fn with_value(sample_size: usize, value: i32) -> Average {
         let mut average = Average::new(sample_size);
         average.add_sample(value);
@@ -109,6 +123,7 @@ impl Average {
         average
     }
 
+    /// Adds a new sample to the data and calculates the new average.
     pub fn add_sample(&mut self, value: i32) {
         if self.index >= self.data.len() {
             self.index = 0;
@@ -159,6 +174,7 @@ impl ListenerStats {
         }
     }
 
+    /// Creates a new ListenerStats struct with existing listener and hourly listener data.
     pub fn with_data(listeners: i32, hourly: [f32; ListenerStats::HOURLY_SIZE]) -> ListenerStats {
         ListenerStats {
             average:          Average::with_value(ListenerStats::AVERAGE_SIZE, listeners),
