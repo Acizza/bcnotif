@@ -85,19 +85,19 @@ impl AverageData {
 #[derive(Debug, Clone)]
 pub struct Average {
     pub current: f32,
-    pub last: f32,
-    pub data: Vec<i32>,
-    index: usize,
-    populated: usize,
+    pub last:    f32,
+    pub data:    Vec<i32>,
+    index:       usize,
+    populated:   usize,
 }
 
 impl Average {
     pub fn new(sample_size: usize) -> Average {
         Average {
-            current: 0.0,
-            last: 0.0,
-            data: vec![0; sample_size],
-            index: 0,
+            current:   0.0,
+            last:      0.0,
+            data:      vec![0; sample_size],
+            index:     0,
             populated: 0,
         }
     }
@@ -147,25 +147,25 @@ pub struct ListenerStats {
 
 impl ListenerStats {
     const AVERAGE_SIZE: usize = 5;
-    const HOURLY_SIZE: usize = 24;
+    const HOURLY_SIZE:  usize = 24;
 
     pub fn new() -> ListenerStats {
         ListenerStats {
-            average: Average::new(ListenerStats::AVERAGE_SIZE),
+            average:          Average::new(ListenerStats::AVERAGE_SIZE),
             unskewed_average: None,
-            average_hourly: [0.0; ListenerStats::HOURLY_SIZE],
-            has_spiked: false,
-            spike_count: 0,
+            average_hourly:   [0.0; ListenerStats::HOURLY_SIZE],
+            has_spiked:       false,
+            spike_count:      0,
         }
     }
 
     pub fn with_data(listeners: i32, hourly: [f32; ListenerStats::HOURLY_SIZE]) -> ListenerStats {
         ListenerStats {
-            average: Average::with_value(ListenerStats::AVERAGE_SIZE, listeners),
+            average:          Average::with_value(ListenerStats::AVERAGE_SIZE, listeners),
             unskewed_average: None,
-            average_hourly: hourly,
-            has_spiked: false,
-            spike_count: 0,
+            average_hourly:   hourly,
+            has_spiked:       false,
+            spike_count:      0,
         }
     }
 
@@ -193,9 +193,13 @@ impl ListenerStats {
         let spike = config.get_feed_spike(&feed);
         let listeners = feed.listeners as f32;
         
+        // If a feed has a low number of listeners, use a higher threshold to
+        // make the calculation less sensitive to very small listener jumps
         let threshold = if listeners < 50.0 {
             spike.jump + (50.0 - listeners) * spike.low_listener_increase
         } else {
+            // Otherwise, use a lower threshold based off of how fast the feed's
+            // listeners are rising to encourage more updates during large incidents
             let delta = self.get_jump(feed.listeners);
             let rise_amount = delta / spike.high_listener_dec_every * spike.high_listener_dec;
 
@@ -207,14 +211,17 @@ impl ListenerStats {
 
     fn update_listeners(&mut self, hour: usize, listeners: u32) {
         self.average.add_sample(listeners as i32);
-        self.average_hourly[hour] = self.average.current;
+        self.average_hourly[hour] = self.get_unskewed_avg();
     }
 
     fn update_unskewed_average(&mut self, listeners: u32, config: &Config) {
         if let Some(unskewed) = self.unskewed_average {
+            // Remove the unskewed average when the current average is close
             if self.average.current - unskewed < unskewed * config.unskewed_avg.reset_pcnt {
                 self.unskewed_average = None;
             } else {
+                // Otherwise, slowly increase the unskewed average to adjust to
+                // natural listener increases
                 self.unskewed_average = Some(math::lerp(
                     unskewed,
                     self.average.current,
@@ -222,19 +229,28 @@ impl ListenerStats {
                 ));
             }
         } else if self.has_spiked && self.average.last > 0.0 {
+            // This is used to set the unskewed average if the listener count is
+            // much higher than the average to avoid polluting the average listener
+            // count with a very high value
             let has_large_jump =
                 listeners as f32 - self.average.current >
                 self.average.last * config.unskewed_avg.jump_required;
 
-            if self.spike_count > 1 || has_large_jump {
+            let has_spiked_enough = self.spike_count > config.unskewed_avg.spikes_required;
+
+            if has_spiked_enough || has_large_jump {
                 self.unskewed_average = Some(self.average.last);
             }
         }
     }
 
-    /// Returns how much the listener count has increased from the
-    /// unskewed average (or plain average if it is not set).
+    /// Returns the unskewed average if it is set, or the current average otherwise.
+    pub fn get_unskewed_avg(&self) -> f32 {
+        self.unskewed_average.unwrap_or(self.average.current)
+    }
+
+    /// Returns the difference in listeners from the unskewed average.
     pub fn get_jump(&self, listeners: u32) -> f32 {
-        listeners as f32 - self.unskewed_average.unwrap_or(self.average.current)
+        listeners as f32 - self.get_unskewed_avg()
     }
 }
