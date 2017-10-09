@@ -1,4 +1,4 @@
-#![windows_subsystem(windows)]
+#![windows_subsystem = "windows"]
 
 #[cfg(windows)] extern crate winrt;
 #[macro_use]    extern crate error_chain;
