@@ -111,7 +111,7 @@ pub fn create_update(index: i32, max_index: i32, feed: &Feed,
         "Name: {}\nListeners: {} (^{}){}\nLink: http://broadcastify.com/listen/feed/{}",
         feed.name,
         feed.listeners,
-        feed_stats.get_average_delta(feed.listeners) as i32,
+        feed_stats.get_jump(feed.listeners) as i32,
         &alert,
         feed.id);
 

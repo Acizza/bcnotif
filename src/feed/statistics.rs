@@ -130,17 +130,18 @@ impl Average {
     }
 }
 
+/// Represents general statistical data for feeds.
 #[derive(Debug, Clone)]
 pub struct ListenerStats {
-    /// Represents the average number of listeners
+    /// Represents the average number of listeners.
     pub average: Average,
-    /// Represents the average number of listeners before a consistent spike occured
+    /// Represents the average number of listeners before a consistent spike occured.
     pub unskewed_average: Option<f32>,
-    /// Contains the average number of listeners for any given hour
+    /// Contains the average number of listeners for any given hour.
     pub average_hourly: [f32; ListenerStats::HOURLY_SIZE],
-    /// Indicates whether or not the listner count has spiked since the last update
+    /// Indicates whether or not the listner count has spiked since the last update.
     pub has_spiked: bool,
-    /// Represents the number of times the feed has spiked consecutively
+    /// Represents the number of times the feed has spiked consecutively.
     pub spike_count: u32,
 }
 
@@ -168,6 +169,7 @@ impl ListenerStats {
         }
     }
 
+    /// Updates the listener data and determines if the feed has spiked
     pub fn update(&mut self, hour: usize, feed: &Feed, config: &Config) {
         self.has_spiked = self.is_spiking(feed, config);
 
@@ -181,6 +183,8 @@ impl ListenerStats {
         self.update_unskewed_average(feed.listeners, config);
     }
 
+    /// Returns true if the specified feed is currently spiking in listeners
+    /// based off of previous data collected by self.update().
     fn is_spiking(&self, feed: &Feed, config: &Config) -> bool {
         if self.average.current == 0.0 {
             return false;
@@ -192,7 +196,7 @@ impl ListenerStats {
         let threshold = if listeners < 50.0 {
             spike.jump + (50.0 - listeners) * spike.low_listener_increase
         } else {
-            let delta = self.get_average_delta(feed.listeners);
+            let delta = self.get_jump(feed.listeners);
             let rise_amount = delta / spike.high_listener_dec_every * spike.high_listener_dec;
 
             spike.jump - rise_amount.min(spike.jump - 0.01)
@@ -228,7 +232,9 @@ impl ListenerStats {
         }
     }
 
-    pub fn get_average_delta(&self, listeners: u32) -> f32 {
+    /// Returns how much the listener count has increased from the
+    /// unskewed average (or plain average if it is not set).
+    pub fn get_jump(&self, listeners: u32) -> f32 {
         listeners as f32 - self.unskewed_average.unwrap_or(self.average.current)
     }
 }
