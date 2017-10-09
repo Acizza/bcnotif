@@ -18,7 +18,7 @@ error_chain! {
 }
 
 create_config_struct!(Spike,
-    jump:                    f32 => "Jump Required"                        => 0.25,
+    jump:                    f32 => "Jump Required"                        => 0.3,
     low_listener_increase:   f32 => "Low Listener Increase"                => [0.0, 0.005],
     high_listener_dec:       f32 => "High Listener Decrease"               => [0.0, 0.02],
     high_listener_dec_every: f32 => "High Listener Decrease Per Listeners" => [1.0, 100.0],
