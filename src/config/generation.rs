@@ -1,3 +1,4 @@
+/// Generates the proper call to the ParseYaml trait
 macro_rules! gen_struct_value {
     // Default with no display name
     ($parent:expr, self, default) => {{
@@ -60,6 +61,7 @@ macro_rules! get_default {
     ($default:expr)              => ($default);
 }
 
+/// Generates a new group of configuration values.
 #[macro_export]
 macro_rules! create_config_struct {
     ($name:ident, $($field:ident: $field_t:ty => $disp_name:tt => $default:tt,)+) => {
@@ -86,11 +88,14 @@ macro_rules! create_config_struct {
     };
 }
 
+/// Generates the name used to read an enum field.
 macro_rules! get_enum_field_name {
     ($field:ident, self)            => (stringify!($field));
     ($field:ident, $disp_name:expr) => ($disp_name);
 }
 
+/// Generates a new group of configuration values where only one variant can be picked.
+/// Supports plain enum variants (with no value required), or ones that require different types for each variant.
 #[macro_export]
 macro_rules! create_config_enum {
     ($name:ident, $($field:ident($field_t:ty) => $disp_name:tt,)+) => {

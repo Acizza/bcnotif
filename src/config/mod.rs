@@ -27,8 +27,8 @@ create_config_struct!(Spike,
 create_config_struct!(UnskewedAverage,
     reset_pcnt:      f32 => "Reset To Average Percentage"  => [0.0, 0.15],
     adjust_pcnt:     f32 => "Adjust to Average Percentage" => [0.0, 0.0075],
-    spikes_required: u32  => "Listener Spikes Required"    => 1,
-    jump_required:   f32 => "Listener Jump Required"       => [1.1, 4.0],
+    spikes_required: u32 => "Spikes Required"              => 1,
+    jump_required:   f32 => "Jump Required To Set"         => [1.1, 4.0],
 );
 
 create_config_enum!(FeedIdent,
@@ -39,6 +39,7 @@ create_config_enum!(FeedIdent,
 );
 
 impl FeedIdent {
+    /// Returns true if the FeedIdent matches the corresponding feed data.
     pub fn matches_feed(&self, feed: &Feed) -> bool {
         match *self {
             FeedIdent::Name(ref name) => *name == feed.name,
@@ -60,6 +61,7 @@ create_config_enum!(WeekdaySpike,
 );
 
 impl WeekdaySpike {
+    /// Returns the spike values for the current day, if it exists in the specified array.
     pub fn get_for_today(weekday_spikes: &[WeekdaySpike]) -> Option<&Spike> {
         use chrono::Weekday::*;
         use self::WeekdaySpike::*;
@@ -154,6 +156,8 @@ gen_base_config!(Config,
 );
 
 impl Config {
+    /// Gets the spike values for the specified feed based off of
+    /// other configuration values that may be set.
     pub fn get_feed_spike(&self, feed: &Feed) -> &Spike {
         // Find any settings for the specified feed
         let feed_setting = self.feed_settings
