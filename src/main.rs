@@ -86,7 +86,7 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<()> {
         }
     }
 
-    show_feeds(display_feeds)?;
+    show_feeds(display_feeds, &config)?;
 
     averages.save()?;
     Ok(())
@@ -103,8 +103,19 @@ fn update_feed_stats<'a>(hour: u32, feed: &Feed, config: &Config, averages: &'a 
     stats
 }
 
-fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>) -> Result<()> {
-    feeds.sort_by_key(|&(ref f, _)| f.listeners);
+fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
+    use config::SortOrder;
+
+    feeds.sort_unstable_by(|&(ref x, _), &(ref y, _)| {
+        match config.misc.sort_order {
+            SortOrder::Ascending  => x.listeners.cmp(&y.listeners),
+            SortOrder::Descending => y.listeners.cmp(&x.listeners),
+        }
+    });
+}
+
+fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>, config: &Config) -> Result<()> {
+    sort_feeds(&mut feeds, &config);
 
     let total = feeds.len() as i32;
 
