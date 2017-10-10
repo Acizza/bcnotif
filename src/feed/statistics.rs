@@ -195,8 +195,9 @@ impl ListenerStats {
             0
         };
 
-        self.update_listeners(hour, feed.listeners);
-        self.update_unskewed_average(feed.listeners, config);
+        self.average.add_sample(feed.listeners as i32);
+        self.update_unskewed_average(feed.listeners as f32, config);
+        self.average_hourly[hour] = self.get_unskewed_avg();
     }
 
     /// Returns true if the specified feed is currently spiking in listeners
@@ -225,19 +226,17 @@ impl ListenerStats {
         listeners - self.average.current >= listeners * threshold
     }
 
-    fn update_listeners(&mut self, hour: usize, listeners: u32) {
-        self.average.add_sample(listeners as i32);
-        self.average_hourly[hour] = self.get_unskewed_avg();
-    }
-
-    fn update_unskewed_average(&mut self, listeners: u32, config: &Config) {
+    fn update_unskewed_average(&mut self, listeners: f32, config: &Config) {
         if let Some(unskewed) = self.unskewed_average {
-            // Remove the unskewed average when the current average is close
+            // Remove the unskewed average if the current average is close to it
             if self.average.current - unskewed < unskewed * config.unskewed_avg.reset_pcnt {
                 self.unskewed_average = None;
-            } else {
-                // Otherwise, slowly increase the unskewed average to adjust to
-                // natural listener increases
+                return
+            }
+            
+            // Otherwise, if there isn't a huge jump in listeners, slowly increase
+            // the unskewed average to adjust to natural listener increases
+            if listeners - unskewed < unskewed * config.unskewed_avg.jump_required {
                 self.unskewed_average = Some(math::lerp(
                     unskewed,
                     self.average.current,
@@ -248,9 +247,7 @@ impl ListenerStats {
             // This is used to set the unskewed average if the listener count is
             // much higher than the average to avoid polluting the average listener
             // count with a very high value
-            let has_large_jump =
-                listeners as f32 - self.average.current >
-                self.average.last * config.unskewed_avg.jump_required;
+            let has_large_jump = listeners > self.average.last * config.unskewed_avg.jump_required;
 
             let has_spiked_enough = self.spike_count > config.unskewed_avg.spikes_required;
 
