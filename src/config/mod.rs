@@ -93,12 +93,21 @@ create_config_struct!(Misc,
 	update_time:       f32         => "Update Time"       => [5.0, 6.0],
 	minimum_listeners: u32         => "Minimum Listeners" => 15,
 	state_feeds_id:    Option<u32> => "State Feeds ID"    => None,
-    sort_order:        SortOrder   => "Feed Sort Order"   => (SortOrder::Descending),
+);
+
+create_config_enum!(SortType,
+    Listeners => self,
+    Jump      => self,
 );
 
 create_config_enum!(SortOrder,
     Ascending  => self,
     Descending => self,
+);
+
+create_config_struct!(Sorting,
+    sort_type:  SortType  => "Sort By"    => (SortType::Listeners),
+    sort_order: SortOrder => "Sort Order" => (SortOrder::Descending),
 );
 
 macro_rules! gen_base_parse_stmt {
@@ -139,6 +148,7 @@ gen_base_config!(Config,
     weekday_spikes: Vec<WeekdaySpike> => all     => "Weekday Spike Percentages",
     feed_settings:  Vec<FeedSetting>  => all     => "Feed Settings",
     misc:           Misc              => default => "Misc",
+    sorting:        Sorting           => default => "Feed Sorting",
     blacklist:      Vec<FeedIdent>    => all     => "Blacklist",
     whitelist:      Vec<FeedIdent>    => all     => "Whitelist",
 );

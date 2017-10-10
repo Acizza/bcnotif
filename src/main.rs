@@ -104,12 +104,28 @@ fn update_feed_stats<'a>(hour: u32, feed: &Feed, config: &Config, averages: &'a 
 }
 
 fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
-    use config::SortOrder;
+    use config::{SortOrder, SortType};
 
-    feeds.sort_unstable_by(|&(ref x, _), &(ref y, _)| {
-        match config.misc.sort_order {
-            SortOrder::Ascending  => x.listeners.cmp(&y.listeners),
-            SortOrder::Descending => y.listeners.cmp(&x.listeners),
+    feeds.sort_unstable_by(|ref x, ref y| {
+        let (x, y) = match config.sorting.sort_order {
+            SortOrder::Ascending  => (x, y),
+            SortOrder::Descending => (y, x),
+        };
+
+        let x_feed  = &x.0;
+        let x_stats = &x.1;
+
+        let y_feed  = &y.0;
+        let y_stats = &y.1;
+
+        match config.sorting.sort_type {
+            SortType::Listeners => x_feed.listeners.cmp(&y_feed.listeners),
+            SortType::Jump => {
+                let x_jump = x_stats.get_jump(x_feed.listeners) as i32;
+                let y_jump = y_stats.get_jump(y_feed.listeners) as i32;
+
+                x_jump.cmp(&y_jump)
+            },
         }
     });
 }
