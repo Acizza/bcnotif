@@ -82,7 +82,9 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<()> {
         }
 
         if stats.has_spiked || feed.alert.is_some() {
-            display_feeds.push((feed, stats.clone()));
+            if (display_feeds.len() as u32) < config.misc.max_feeds {
+                display_feeds.push((feed, stats.clone()));
+            }
         }
     }
 

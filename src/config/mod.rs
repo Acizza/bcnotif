@@ -92,9 +92,10 @@ create_config_struct!(FeedSetting,
 );
 
 create_config_struct!(Misc,
-	update_time:       f32         => "Update Time"       => [5.0, 6.0],
-	minimum_listeners: u32         => "Minimum Listeners" => 15,
-	state_feeds_id:    Option<u32> => "State Feeds ID"    => None,
+	update_time:       f32         => "Update Time"              => [5.0, 6.0],
+	minimum_listeners: u32         => "Minimum Listeners"        => 15,
+	state_feeds_id:    Option<u32> => "State Feeds ID"           => None,
+    max_feeds:         u32         => "Maximum Feeds To Display" => 10,
 );
 
 create_config_enum!(SortType,
