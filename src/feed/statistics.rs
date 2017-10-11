@@ -61,7 +61,15 @@ impl AverageData {
             }
 
             let listeners = averages[hour] as i32;
-            self.data.insert(id, ListenerStats::with_data(listeners, averages));
+
+            // Zero listeners means that data for the current hour doesn't exist yet
+            let stats = if listeners == 0 {
+                ListenerStats::with_hourly(averages)
+            } else {
+                ListenerStats::with_data(listeners, averages)
+            };
+
+            self.data.insert(id, stats);
         }
 
         Ok(())
@@ -165,10 +173,15 @@ impl ListenerStats {
     const HOURLY_SIZE:  usize = 24;
 
     pub fn new() -> ListenerStats {
+        ListenerStats::with_hourly([0.0; ListenerStats::HOURLY_SIZE])
+    }
+
+    /// Creates a new ListenerStats struct with existing hourly data.
+    pub fn with_hourly(hourly: [f32; ListenerStats::HOURLY_SIZE]) -> ListenerStats {
         ListenerStats {
             average:          Average::new(ListenerStats::AVERAGE_SIZE),
             unskewed_average: None,
-            average_hourly:   [0.0; ListenerStats::HOURLY_SIZE],
+            average_hourly:   hourly,
             has_spiked:       false,
             spike_count:      0,
         }
