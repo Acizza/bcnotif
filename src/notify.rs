@@ -98,7 +98,7 @@ pub fn create_update(index: i32, max_index: i32, feed: &Feed,
 
     let title = format!(
         "{} - Broadcastify Update ({} of {})",
-        feed.get_state_abbrev().unwrap_or("UNK"),
+        feed.state.abbrev,
         index,
         max_index);
 

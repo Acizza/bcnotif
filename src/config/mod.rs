@@ -45,7 +45,7 @@ impl FeedIdent {
             FeedIdent::Name(ref name) => *name == feed.name,
             FeedIdent::ID(id)         => id == feed.id,
             FeedIdent::County(ref c)  => *c == feed.county,
-            FeedIdent::State(id)      => id == feed.state_id,
+            FeedIdent::State(id)      => id == feed.state.id,
         }
     }
 }

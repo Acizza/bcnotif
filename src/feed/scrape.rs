@@ -1,6 +1,6 @@
 extern crate select;
 
-use ::feed::Feed;
+use ::feed::{Feed, State};
 use self::select::document::Document;
 use self::select::node::Node;
 use self::select::predicate::{Predicate, Class, Name};
@@ -33,41 +33,37 @@ pub fn scrape_top(body: &str) -> Result<Vec<Feed>> {
     for row in feed_data {
         let (id, name) = parse_id_and_name(&row, "w100")?;
 
-        let (state_id, county) = {
-            // The top 50 feed list allows multiple states and/or counties to appear,
-            // so we can't assume their location
+        // The top 50 feed list allows multiple states and/or counties to appear,
+        // so we can't assume their location
+        let location_info = row
+            .find(Name("td"))
+            .nth(1)
+            .ok_or(ErrorKind::NoElement("location".into()))?;
 
-            let location_info = row
-                .find(Name("td"))
-                .nth(1)
-                .ok_or(ErrorKind::NoElement("location".into()))?;
+        let mut hyperlinks = location_info
+            .find(Name("a"))
+            .filter_map(|link| {
+                link.attr("href").map(|url| (url, link.text()))
+            });
 
-            let mut hyperlinks = location_info
-                .find(Name("a"))
-                .filter_map(|link| {
-                    link.attr("href").map(|url| (url, link.text()))
-                });
+        let (state_link, state_abbrev) = hyperlinks.next()
+            .ok_or(ErrorKind::NoElement("state data".into()))?;
 
-            let state_id = hyperlinks
-                .next()
-                .and_then(|(link, _)| parse_link_id(&link))
-                .ok_or(ErrorKind::NoElement("state id".into()))?
-                .parse()
-                .chain_err(|| ErrorKind::FailedConvert("state id".into()))?;
+        let state_id = parse_link_id(state_link)
+            .ok_or(ErrorKind::NoElement("state id".into()))?
+            .parse()
+            .chain_err(|| ErrorKind::FailedConvert("state id".into()))?;
 
-            let county = match hyperlinks.next() {
-                Some((link, ref text)) if link.starts_with("/listen/ctid") => {
-                    text.clone()
-                },
-                _ => "Numerous".to_string(),
-            };
-
-            (state_id, county)
+        let county = match hyperlinks.next() {
+            Some((link, ref text)) if link.starts_with("/listen/ctid") => {
+                text.clone()
+            },
+            _ => "Numerous".to_string(),
         };
 
         feeds.push(Feed {
             id:        id,
-            state_id:  state_id,
+            state:     State::new(state_id, state_abbrev),
             county:    county,
             name:      name,
             listeners: parse_listeners(&row)?,
@@ -82,7 +78,7 @@ pub fn scrape_top(body: &str) -> Result<Vec<Feed>> {
     Ok(feeds)
 }
 
-pub fn scrape_state(state_id: u32, body: &str) -> Result<Vec<Feed>> {
+pub fn scrape_state(state: &State, body: &str) -> Result<Vec<Feed>> {
     let doc = Document::from(body);
 
     // TODO: add support for areawide feeds
@@ -124,7 +120,7 @@ pub fn scrape_state(state_id: u32, body: &str) -> Result<Vec<Feed>> {
 
         feeds.push(Feed {
             id:        id,
-            state_id:  state_id,
+            state:     state.clone(),
             county:    county,
             name:      name,
             listeners: parse_listeners(&feed)?,
