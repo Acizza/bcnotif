@@ -37,7 +37,10 @@ fn main() {
 
     match start() {
         Ok(_) => (),
-        Err(err) => eprintln!("fatal error: {:?}", err),
+        Err(err) => {
+            eprintln!("FATAL ERROR:");
+            error::display(&err);
+        },
     }
 
     #[cfg(windows)]
@@ -55,7 +58,11 @@ fn start() -> Result<()> {
     }
 
     loop {
-        let config = Config::from_file(&config_path)?;
+        let config = if !config_path.exists() {
+            Config::default()
+        } else {
+            Config::from_file(&config_path)?
+        };
 
         match perform_update(&mut averages, &config) {
             Ok(_) => (),
