@@ -30,7 +30,7 @@ Weekday Spike Percentages:
 
 The above configuration will increase the jump required for Friday, Saturday, and Sunday by 10% from the default, which will reduce the otherwise increased feed updates since more people have the opportunity to listen to feeds on the weekend.
 
-And another common configuration would be to make feeds in your local area more sensitive to updates, like so:
+Yet another common configuration would be to make feeds in your local area more sensitive to updates, like so:
 ```yaml
 Feed Settings:
   - County: Sacramento
@@ -69,19 +69,14 @@ Misc:
   State Feeds ID: 6     # The state to process extra feed from in an update. It is not set by default
   Maximum Feeds To Display: 10
 
-# This controls the global spike values (which are used to determine
-# if a feed is jumping in listeners)
+# This controls the global spike values (which are used to determine if a feed is jumping in listeners)
 Spike Percentages:
   # This is the jump multiplier required for a feed to be considered "jumping".
-  # Ex: If a feed's listeners are 30% higher than its current average
-  # listeners, it will be displayed
+  # Ex: If a feed's listeners are 30% higher than its current average listeners, it will be displayed
   Jump Required: 0.3
-  # This controls how much (as a multiplier) the jump required for a feed will
-  # increase when its listeners are less than 50
+  # This controls how much (as a multiplier) the jump required for a feed will increase when its listeners are less than 50
   Low Listener Increase: 0.02
-  # This is used along with the "High Listener Decrease Per Listeners" value
-  # to control how much the jump required will decrease when a feed is jumping
-  # to encourage further notifications
+  # This is used along with the "High Listener Decrease Per Listeners" value to control how much the jump required will decrease when a feed is jumping to encourage further notifications
   High Listener Decrease: 0.02
   # This will decrease the jump required multiplier by the "High Listener Decrease" value for every x listeners set by this value
   High Listener Decrease Per Listeners: 100.0
@@ -158,3 +153,5 @@ Unskewed Average:
   # How much (as a multiplier) the current listeners of a feed need to be above the saved average to set the unskewed average immediately
   Jump Required To Set: 4.0
 ```
+
+It is also worth noting that the coniguration file is reloaded on every update, so you do not need to restart the application after making changes to it.
