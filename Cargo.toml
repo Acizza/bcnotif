@@ -12,7 +12,7 @@ chrono      = "0.4"
 csv         = "1.0.0-beta.5"
 select      = "0.4"
 reqwest     = "0.8"
-yaml-rust   = "0.3"
+yaml-rust   = "0.4"
 
 [target.'cfg(any(unix, macos))'.dependencies]
 notify-rust = "3"
