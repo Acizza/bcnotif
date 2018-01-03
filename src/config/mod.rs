@@ -1,21 +1,13 @@
 extern crate yaml_rust;
 
-#[macro_use] mod generation;
+#[macro_use]
+mod generation;
 
-use chrono::{Local, Datelike};
+use chrono::{Datelike, Local};
+use failure::Error;
 use feed::Feed;
-use self::yaml_rust::{YamlLoader, Yaml};
+use self::yaml_rust::{Yaml, YamlLoader};
 use std::path::Path;
-
-error_chain! {
-    links {
-        Util(::util::Error, ::util::ErrorKind);
-    }
-
-    foreign_links {
-        Yaml(yaml_rust::ScanError);
-    }
-}
 
 create_config_struct!(Spike,
     jump:                    f32 => "Jump Required"                        => 0.3,
@@ -43,9 +35,9 @@ impl FeedIdent {
     pub fn matches_feed(&self, feed: &Feed) -> bool {
         match *self {
             FeedIdent::Name(ref name) => *name == feed.name,
-            FeedIdent::ID(id)         => id == feed.id,
-            FeedIdent::County(ref c)  => *c == feed.county,
-            FeedIdent::State(id)      => id == feed.state.id,
+            FeedIdent::ID(id) => id == feed.id,
+            FeedIdent::County(ref c) => *c == feed.county,
+            FeedIdent::State(id) => id == feed.state.id,
         }
     }
 }
@@ -70,12 +62,12 @@ impl WeekdaySpike {
 
         for ws in weekday_spikes {
             match (weekday, ws) {
-                (Mon, &Monday(ref s))    |
-                (Tue, &Tuesday(ref s))   |
+                (Mon, &Monday(ref s)) |
+                (Tue, &Tuesday(ref s)) |
                 (Wed, &Wednesday(ref s)) |
-                (Thu, &Thursday(ref s))  |
-                (Fri, &Friday(ref s))    |
-                (Sat, &Saturday(ref s))  |
+                (Thu, &Thursday(ref s)) |
+                (Fri, &Friday(ref s)) |
+                (Sat, &Saturday(ref s)) |
                 (Sun, &Sunday(ref s)) => return Some(&s),
                 _ => (),
             }
@@ -127,7 +119,7 @@ macro_rules! gen_base_config {
         }
 
         impl $name {
-            pub fn from_file(path: &Path) -> Result<$name> {
+            pub fn from_file(path: &Path) -> Result<$name, Error> {
                 let file = ::util::read_file(path)?;
 
                 if file.len() == 0 {
@@ -167,13 +159,9 @@ impl Config {
 
         match feed_setting {
             Some(setting) => {
-                WeekdaySpike::get_for_today(&setting.weekday_spikes)
-                    .unwrap_or(&setting.spike)
-            },
-            None => {
-                WeekdaySpike::get_for_today(&self.weekday_spikes)
-                    .unwrap_or(&self.global_spike)
+                WeekdaySpike::get_for_today(&setting.weekday_spikes).unwrap_or(&setting.spike)
             }
+            None => WeekdaySpike::get_for_today(&self.weekday_spikes).unwrap_or(&self.global_spike),
         }
     }
 }
@@ -187,10 +175,10 @@ trait ParseYaml: Sized + Default {
 
     fn all(doc: &Yaml) -> Vec<Self> {
         doc.as_vec()
-           .unwrap_or(&Vec::new())
-           .iter()
-           .filter_map(ParseYaml::from)
-           .collect()
+            .unwrap_or(&Vec::new())
+            .iter()
+            .filter_map(ParseYaml::from)
+            .collect()
     }
 }
 
@@ -218,7 +206,7 @@ impl ParseYaml for String {
         use self::yaml_rust::Yaml::*;
         match *doc {
             String(ref s) => Some(s.clone()),
-            _             => None,
+            _ => None,
         }
     }
 }

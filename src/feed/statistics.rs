@@ -1,26 +1,16 @@
 extern crate csv;
 
 use config::Config;
-use chrono::{Utc, Timelike};
+use chrono::{Timelike, Utc};
+use failure::Error;
 use feed::Feed;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use ::math;
+use math;
 
-error_chain! {
-    foreign_links {
-        Csv(csv::Error);
-        ParseInt(::std::num::ParseIntError);
-        ParseFloat(::std::num::ParseFloatError);
-        Utf8Error(::std::string::FromUtf8Error);
-        Io(::std::io::Error);
-    }
-
-    errors {
-        TooFewRows {
-            display("csv file contains record with too few rows")
-        }
-    }
+#[derive(Fail, Debug)]
+pub enum AverageDataError {
+    #[fail(display = "csv file contains record with too few rows")] TooFewRows,
 }
 
 type FeedID = u32;
@@ -41,15 +31,15 @@ impl AverageData {
         }
     }
 
-    pub fn load(&mut self) -> Result<()> {
+    pub fn load(&mut self) -> Result<(), Error> {
         let hour = Utc::now().hour() as usize;
         let mut rdr = csv::Reader::from_path(&self.path)?;
 
         for result in rdr.records() {
             let record = result?;
-            
+
             if record.len() < 1 + ListenerStats::HOURLY_SIZE {
-                bail!(ErrorKind::TooFewRows);
+                bail!(AverageDataError::TooFewRows);
             }
 
             let id = record[0].parse()?;
@@ -75,7 +65,7 @@ impl AverageData {
         Ok(())
     }
 
-    pub fn save(&self) -> Result<()> {
+    pub fn save(&self) -> Result<(), csv::Error> {
         let mut wtr = csv::Writer::from_path(&self.path)?;
         let mut fields = Vec::with_capacity(1 + ListenerStats::HOURLY_SIZE);
 
@@ -115,10 +105,10 @@ pub struct Average {
 impl Average {
     pub fn new(sample_size: usize) -> Average {
         Average {
-            current:   0.0,
-            last:      0.0,
-            data:      vec![0; sample_size],
-            index:     0,
+            current: 0.0,
+            last: 0.0,
+            data: vec![0; sample_size],
+            index: 0,
             populated: 0,
         }
     }
@@ -146,10 +136,8 @@ impl Average {
 
         self.last = self.current;
 
-        self.current = self.data
-            .iter()
-            .take(self.populated)
-            .sum::<i32>() as f32 / self.populated as f32;
+        self.current =
+            self.data.iter().take(self.populated).sum::<i32>() as f32 / self.populated as f32;
     }
 }
 
@@ -170,7 +158,7 @@ pub struct ListenerStats {
 
 impl ListenerStats {
     const AVERAGE_SIZE: usize = 5;
-    const HOURLY_SIZE:  usize = 24;
+    const HOURLY_SIZE: usize = 24;
 
     pub fn new() -> ListenerStats {
         ListenerStats::with_hourly([0.0; ListenerStats::HOURLY_SIZE])
@@ -179,22 +167,22 @@ impl ListenerStats {
     /// Creates a new ListenerStats struct with existing hourly data.
     pub fn with_hourly(hourly: [f32; ListenerStats::HOURLY_SIZE]) -> ListenerStats {
         ListenerStats {
-            average:          Average::new(ListenerStats::AVERAGE_SIZE),
+            average: Average::new(ListenerStats::AVERAGE_SIZE),
             unskewed_average: None,
-            average_hourly:   hourly,
-            has_spiked:       false,
-            spike_count:      0,
+            average_hourly: hourly,
+            has_spiked: false,
+            spike_count: 0,
         }
     }
 
     /// Creates a new ListenerStats struct with existing listener and hourly listener data.
     pub fn with_data(listeners: i32, hourly: [f32; ListenerStats::HOURLY_SIZE]) -> ListenerStats {
         ListenerStats {
-            average:          Average::with_value(ListenerStats::AVERAGE_SIZE, listeners),
+            average: Average::with_value(ListenerStats::AVERAGE_SIZE, listeners),
             unskewed_average: None,
-            average_hourly:   hourly,
-            has_spiked:       false,
-            spike_count:      0,
+            average_hourly: hourly,
+            has_spiked: false,
+            spike_count: 0,
         }
     }
 
@@ -222,7 +210,7 @@ impl ListenerStats {
 
         let spike = config.get_feed_spike(&feed);
         let listeners = feed.listeners as f32;
-        
+
         // If a feed has a low number of listeners, use a higher threshold to
         // make the calculation less sensitive to very small listener jumps
         let threshold = if listeners < 50.0 {
@@ -244,16 +232,16 @@ impl ListenerStats {
             // Remove the unskewed average if the current average is close to it
             if self.average.current - unskewed < unskewed * config.unskewed_avg.reset_pcnt {
                 self.unskewed_average = None;
-                return
+                return;
             }
-            
+
             // Otherwise, if there isn't a huge jump in listeners, slowly increase
             // the unskewed average to adjust to natural listener increases
             if listeners - unskewed < unskewed * config.unskewed_avg.jump_required {
                 self.unskewed_average = Some(math::lerp(
                     unskewed,
                     self.average.current,
-                    config.unskewed_avg.adjust_pcnt
+                    config.unskewed_avg.adjust_pcnt,
                 ));
             }
         } else if self.has_spiked && self.average.last > 0.0 {

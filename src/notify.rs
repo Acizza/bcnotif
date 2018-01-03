@@ -1,13 +1,9 @@
 use feed::Feed;
 use feed::statistics::ListenerStats;
 
-error_chain! {
-    errors {
-        CreationFailed {
-            display("failed to create notification")
-        }
-    }
-}
+#[derive(Fail, Debug)]
+#[fail(display = "failed to create notification")]
+pub struct CreationFailedError;
 
 pub enum Icon {
     Update,
@@ -30,13 +26,13 @@ mod unix {
         }
     }
 
-    pub fn create(icon: Icon, title: &str, body: &str) -> Result<()> {
+    pub fn create(icon: Icon, title: &str, body: &str) -> Result<(), CreationFailedError> {
         Notification::new()
             .summary(title)
             .body(body)
             .icon(icon.get_name())
             .show()
-            .chain_err(|| ErrorKind::CreationFailed)?;
+            .map_err(|_| CreationFailedError)?;
 
         Ok(())
     }
@@ -79,9 +75,9 @@ mod windows {
         Ok(())
     }
 
-    pub fn create(_: Icon, title: &str, body: &str) -> super::Result<()> {
+    pub fn create(_: Icon, title: &str, body: &str) -> super::Result<(), Error> {
         inner_create(title, body)
-            .map_err(|err| format!("{:?}", err))?;
+            .map_err(|err| format_err!("{:?}", err))?;
 
         Ok(())
     }
@@ -94,7 +90,7 @@ use self::unix::create;
 use self::windows::create;
 
 pub fn create_update(index: i32, max_index: i32, feed: &Feed,
-    feed_stats: &ListenerStats) -> Result<()> {
+    feed_stats: &ListenerStats) -> Result<(), CreationFailedError> {
 
     let title = format!(
         "{} - Broadcastify Update ({} of {})",
@@ -118,6 +114,6 @@ pub fn create_update(index: i32, max_index: i32, feed: &Feed,
     create(Icon::Update, &title, &body)
 }
 
-pub fn create_error(body: &str) -> Result<()> {
+pub fn create_error(body: &str) -> Result<(), CreationFailedError> {
     create(Icon::Error, "Broadcastify Update Error", body)
 }

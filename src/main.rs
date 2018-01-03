@@ -1,10 +1,16 @@
 #![windows_subsystem = "windows"]
 
-#[cfg(windows)] extern crate winrt;
-#[macro_use]    extern crate error_chain;
+#[macro_use]
+extern crate failure;
+
 extern crate chrono;
 
-#[macro_use] mod util;
+#[cfg(windows)]
+extern crate winrt;
+
+#[macro_use]
+mod util;
+
 mod config;
 mod error;
 mod feed;
@@ -12,42 +18,30 @@ mod math;
 mod notify;
 
 use config::Config;
-use chrono::{Utc, Timelike};
+use chrono::{Timelike, Utc};
+use failure::Error;
 use feed::Feed;
 use feed::statistics::{AverageData, ListenerStats};
 use std::time::Duration;
 use std::path::PathBuf;
 
-error_chain! {
-    links {
-        Config(config::Error, config::ErrorKind);
-        Feed(feed::Error, feed::ErrorKind);
-        Statistics(feed::statistics::Error, feed::statistics::ErrorKind);
-        Notify(notify::Error, notify::ErrorKind);
-    }
-
-    foreign_links {
-        Io(std::io::Error);
-    }
-}
-
 fn main() {
     #[cfg(windows)]
     let rt = winrt::RuntimeContext::init();
 
-    match start() {
+    match run() {
         Ok(_) => (),
         Err(err) => {
-            eprintln!("FATAL ERROR:");
+            eprintln!("fatal error:");
             error::display(&err);
-        },
+        }
     }
 
     #[cfg(windows)]
     rt.uninit();
 }
 
-fn start() -> Result<()> {
+fn run() -> Result<(), Error> {
     let exe_dir = get_exe_directory()?;
     let config_path = exe_dir.clone().join("config.yaml");
 
@@ -73,13 +67,13 @@ fn start() -> Result<()> {
     }
 }
 
-fn perform_update(averages: &mut AverageData, config: &Config) -> Result<()> {
+fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Error> {
     let hour = Utc::now().hour();
     let mut display_feeds = Vec::new();
 
     for feed in Feed::download_and_scrape(&config)? {
         if feed.listeners < config.misc.minimum_listeners {
-            continue
+            continue;
         }
 
         let stats = update_feed_stats(hour, &feed, &config, averages);
@@ -101,12 +95,13 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<()> {
     Ok(())
 }
 
-fn update_feed_stats<'a>(hour: u32, feed: &Feed, config: &Config, averages: &'a mut AverageData)
-    -> &'a ListenerStats {
-
-    let stats = averages.data
-        .entry(feed.id)
-        .or_insert(ListenerStats::new());
+fn update_feed_stats<'a>(
+    hour: u32,
+    feed: &Feed,
+    config: &Config,
+    averages: &'a mut AverageData,
+) -> &'a ListenerStats {
+    let stats = averages.data.entry(feed.id).or_insert(ListenerStats::new());
 
     stats.update(hour as usize, feed, &config);
     stats
@@ -117,14 +112,14 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
 
     feeds.sort_unstable_by(|ref x, ref y| {
         let (x, y) = match config.sorting.sort_order {
-            SortOrder::Ascending  => (x, y),
+            SortOrder::Ascending => (x, y),
             SortOrder::Descending => (y, x),
         };
 
-        let x_feed  = &x.0;
+        let x_feed = &x.0;
         let x_stats = &x.1;
 
-        let y_feed  = &y.0;
+        let y_feed = &y.0;
         let y_stats = &y.1;
 
         match config.sorting.sort_type {
@@ -134,12 +129,12 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
                 let y_jump = y_stats.get_jump(y_feed.listeners) as i32;
 
                 x_jump.cmp(&y_jump)
-            },
+            }
         }
     });
 }
 
-fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>, config: &Config) -> Result<()> {
+fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>, config: &Config) -> Result<(), Error> {
     sort_feeds(&mut feeds, &config);
 
     let total = feeds.len() as i32;
@@ -155,17 +150,19 @@ fn print_info(feed: &Feed, stats: &ListenerStats) {
     println!("[{}] {}", feed.id, feed.name);
     println!("\tlisteners    | {}", feed.listeners);
 
-    println!("\taverage lis. | cur: {} last: {} samples: {:?}",
+    println!(
+        "\taverage lis. | cur: {} last: {} samples: {:?}",
         stats.average.current,
         stats.average.last,
-        stats.average.data);
+        stats.average.data
+    );
 
     println!("\tunskewed avg | {:?}", stats.unskewed_average);
     println!("\thas spiked   | {}", stats.has_spiked);
     println!("\ttimes spiked | {}", stats.spike_count);
 }
 
-fn get_exe_directory() -> Result<PathBuf> {
+fn get_exe_directory() -> std::io::Result<PathBuf> {
     let mut path = std::env::current_exe()?;
     path.pop();
     Ok(path)
