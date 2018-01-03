@@ -27,7 +27,7 @@ pub fn scrape_top(body: &str) -> Result<Vec<Feed>, Error> {
         // so we can't assume their location
         let location_info = row.find(Name("td"))
             .nth(1)
-            .ok_or(ScrapeError::NoElement("location".into()))?;
+            .ok_or_else(|| ScrapeError::NoElement("location".into()))?;
 
         let mut hyperlinks = location_info
             .find(Name("a"))
@@ -35,10 +35,10 @@ pub fn scrape_top(body: &str) -> Result<Vec<Feed>, Error> {
 
         let (state_link, state_abbrev) = hyperlinks
             .next()
-            .ok_or(ScrapeError::NoElement("state data".into()))?;
+            .ok_or_else(|| ScrapeError::NoElement("state data".into()))?;
 
         let state_id = parse_link_id(state_link)
-            .ok_or(ScrapeError::NoElement("state id".into()))?
+            .ok_or_else(|| ScrapeError::NoElement("state id".into()))?
             .parse::<u32>()
             .context(ScrapeError::FailedConvert("state id".into()))?;
 
@@ -59,7 +59,7 @@ pub fn scrape_top(body: &str) -> Result<Vec<Feed>, Error> {
         });
     }
 
-    if feeds.len() == 0 {
+    if feeds.is_empty() {
         bail!(ScrapeError::NoneFound);
     }
 
@@ -76,7 +76,7 @@ pub fn scrape_state(state: &State, body: &str) -> Result<Vec<Feed>, Error> {
         // implemented yet, we simply skip over that table
         let tables = doc.find(Class("btable")).take(2).collect::<Vec<_>>();
 
-        if tables.len() == 0 {
+        if tables.is_empty() {
             bail!(ScrapeError::NoElement("feed data".into()));
         } else if tables.len() >= 2 {
             tables[1]
@@ -95,7 +95,7 @@ pub fn scrape_state(state: &State, body: &str) -> Result<Vec<Feed>, Error> {
         let county = feed.find(Name("a"))
             .next()
             .map(|node| node.text())
-            .unwrap_or("Numerous".to_string());
+            .unwrap_or_else(|| "Numerous".to_string());
 
         let alert = feed.find(Name("font").and(Class("fontRed")))
             .next()
@@ -111,7 +111,7 @@ pub fn scrape_state(state: &State, body: &str) -> Result<Vec<Feed>, Error> {
         });
     }
 
-    if feeds.len() == 0 {
+    if feeds.is_empty() {
         bail!(ScrapeError::NoneFound);
     }
 
@@ -121,11 +121,11 @@ pub fn scrape_state(state: &State, body: &str) -> Result<Vec<Feed>, Error> {
 fn parse_id_and_name(node: &Node, class_name: &str) -> Result<(u32, String), Error> {
     let base = node.find(Class(class_name).descendant(Name("a")))
         .next()
-        .ok_or(ScrapeError::NoElement("id and name".into()))?;
+        .ok_or_else(|| ScrapeError::NoElement("id and name".into()))?;
 
     let id = base.attr("href")
         .and_then(parse_link_id)
-        .ok_or(ScrapeError::NoElement("feed id".into()))?
+        .ok_or_else(|| ScrapeError::NoElement("feed id".into()))?
         .parse::<u32>()
         .context(ScrapeError::FailedConvert("state id".into()))?;
 
@@ -136,7 +136,7 @@ fn parse_listeners(node: &Node) -> Result<u32, Error> {
     let text = node.find(Class("c").and(Class("m")))
         .next()
         .map(|node| node.text())
-        .ok_or(ScrapeError::NoElement("feed listeners".into()))?;
+        .ok_or_else(|| ScrapeError::NoElement("feed listeners".into()))?;
 
     let result = text.trim_right()
         .parse::<u32>()

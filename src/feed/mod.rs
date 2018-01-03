@@ -58,21 +58,21 @@ impl PartialEq for Feed {
 }
 
 fn filter_whitelist_blacklist(config: &Config, feeds: &mut Vec<Feed>) {
-    if config.whitelist.len() > 0 {
-        feeds.retain(|ref feed| {
+    if !config.whitelist.is_empty() {
+        feeds.retain(|feed| {
             config
                 .whitelist
                 .iter()
-                .any(|entry| entry.matches_feed(&feed))
+                .any(|entry| entry.matches_feed(feed))
         });
     }
 
-    if config.blacklist.len() > 0 {
-        feeds.retain(|ref feed| {
+    if !config.blacklist.is_empty() {
+        feeds.retain(|feed| {
             config
                 .blacklist
                 .iter()
-                .any(|entry| !entry.matches_feed(&feed))
+                .any(|entry| !entry.matches_feed(feed))
         });
     }
 }
@@ -112,12 +112,12 @@ impl FeedSource {
         match *self {
             FeedSource::Top => {
                 let scraped =
-                    scrape::scrape_top(&body).context(FeedSourceError::FailedToParseTopFeeds)?;
+                    scrape::scrape_top(body).context(FeedSourceError::FailedToParseTopFeeds)?;
 
                 Ok(scraped)
             }
             FeedSource::State(ref state) => {
-                let scraped = scrape::scrape_state(state, &body)
+                let scraped = scrape::scrape_state(state, body)
                     .context(FeedSourceError::FailedToParseStateFeeds)?;
 
                 Ok(scraped)

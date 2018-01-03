@@ -1,4 +1,4 @@
-/// Generates the proper call to the ParseYaml trait
+/// Generates the proper call to the `ParseYaml` trait
 macro_rules! gen_struct_value {
     // Default with no display name
     ($parent:expr, self, default) => {{

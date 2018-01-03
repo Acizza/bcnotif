@@ -26,7 +26,7 @@ mod unix {
         }
     }
 
-    pub fn create(icon: Icon, title: &str, body: &str) -> Result<(), CreationFailedError> {
+    pub fn create(icon: &Icon, title: &str, body: &str) -> Result<(), CreationFailedError> {
         Notification::new()
             .summary(title)
             .body(body)
@@ -75,7 +75,7 @@ mod windows {
         Ok(())
     }
 
-    pub fn create(_: Icon, title: &str, body: &str) -> super::Result<(), Error> {
+    pub fn create(_: &Icon, title: &str, body: &str) -> super::Result<(), Error> {
         inner_create(title, body)
             .map_err(|err| format_err!("{:?}", err))?;
 
@@ -111,9 +111,9 @@ pub fn create_update(index: i32, max_index: i32, feed: &Feed,
         &alert,
         feed.id);
 
-    create(Icon::Update, &title, &body)
+    create(&Icon::Update, &title, &body)
 }
 
 pub fn create_error(body: &str) -> Result<(), CreationFailedError> {
-    create(Icon::Error, "Broadcastify Update Error", body)
+    create(&Icon::Error, "Broadcastify Update Error", body)
 }

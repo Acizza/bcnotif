@@ -71,25 +71,25 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
     let hour = Utc::now().hour();
     let mut display_feeds = Vec::new();
 
-    for feed in Feed::download_and_scrape(&config)? {
+    for feed in Feed::download_and_scrape(config)? {
         if feed.listeners < config.misc.minimum_listeners {
             continue;
         }
 
-        let stats = update_feed_stats(hour, &feed, &config, averages);
+        let stats = update_feed_stats(hour, &feed, config, averages);
 
         if cfg!(feature = "print-feed-data") {
-            print_info(&feed, &stats);
+            print_info(&feed, stats);
         }
 
-        if stats.has_spiked || feed.alert.is_some() {
-            if (display_feeds.len() as u32) < config.misc.max_feeds {
-                display_feeds.push((feed, stats.clone()));
-            }
+        let can_show = stats.has_spiked || feed.alert.is_some();
+
+        if can_show && (display_feeds.len() as u32) < config.misc.max_feeds {
+            display_feeds.push((feed, stats.clone()));
         }
     }
 
-    show_feeds(display_feeds, &config)?;
+    show_feeds(display_feeds, config)?;
 
     averages.save()?;
     Ok(())
@@ -101,16 +101,16 @@ fn update_feed_stats<'a>(
     config: &Config,
     averages: &'a mut AverageData,
 ) -> &'a ListenerStats {
-    let stats = averages.data.entry(feed.id).or_insert(ListenerStats::new());
+    let stats = averages.data.entry(feed.id).or_insert_with(ListenerStats::new);
 
-    stats.update(hour as usize, feed, &config);
+    stats.update(hour as usize, feed, config);
     stats
 }
 
 fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
     use config::{SortOrder, SortType};
 
-    feeds.sort_unstable_by(|ref x, ref y| {
+    feeds.sort_unstable_by(|x, y| {
         let (x, y) = match config.sorting.sort_order {
             SortOrder::Ascending => (x, y),
             SortOrder::Descending => (y, x),
@@ -135,7 +135,7 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
 }
 
 fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>, config: &Config) -> Result<(), Error> {
-    sort_feeds(&mut feeds, &config);
+    sort_feeds(&mut feeds, config);
 
     let total = feeds.len() as i32;
 

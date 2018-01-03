@@ -18,7 +18,7 @@ fn print_with_backtrace(msg: &str, err: &Error) {
 
 /// Displays the provided error with a notification and by writing it to the terminal
 pub fn display(err: &Error) {
-    let msg = build_err_msg(&err);
+    let msg = build_err_msg(err);
     print_with_backtrace(&msg, err);
 
     match notify::create_error(&msg) {

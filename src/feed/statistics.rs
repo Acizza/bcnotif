@@ -15,7 +15,7 @@ pub enum AverageDataError {
 
 type FeedID = u32;
 
-/// An interface to save and load ListenerStats data.
+/// An interface to save and load `ListenerStats` data.
 pub struct AverageData {
     /// The path to the file to save and load data from.
     pub path: PathBuf,
@@ -72,7 +72,7 @@ impl AverageData {
         for (id, stats) in &self.data {
             fields.push(id.to_string());
 
-            for average in stats.average_hourly.iter() {
+            for average in &stats.average_hourly {
                 fields.push(average.round().to_string());
             }
 
@@ -208,7 +208,7 @@ impl ListenerStats {
             return false;
         }
 
-        let spike = config.get_feed_spike(&feed);
+        let spike = config.get_feed_spike(feed);
         let listeners = feed.listeners as f32;
 
         // If a feed has a low number of listeners, use a higher threshold to

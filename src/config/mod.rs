@@ -68,7 +68,7 @@ impl WeekdaySpike {
                 (Thu, &Thursday(ref s)) |
                 (Fri, &Friday(ref s)) |
                 (Sat, &Saturday(ref s)) |
-                (Sun, &Sunday(ref s)) => return Some(&s),
+                (Sun, &Sunday(ref s)) => return Some(s),
                 _ => (),
             }
         }
@@ -155,7 +155,7 @@ impl Config {
         // Find any settings for the specified feed
         let feed_setting = self.feed_settings
             .iter()
-            .find(|s| s.ident.matches_feed(&feed));
+            .find(|s| s.ident.matches_feed(feed));
 
         match feed_setting {
             Some(setting) => {
@@ -170,7 +170,7 @@ trait ParseYaml: Sized + Default {
     fn from(doc: &Yaml) -> Option<Self>;
 
     fn from_or_default(doc: &Yaml) -> Self {
-        ParseYaml::from(&doc).unwrap_or(Self::default())
+        ParseYaml::from(doc).unwrap_or_default()
     }
 
     fn all(doc: &Yaml) -> Vec<Self> {
