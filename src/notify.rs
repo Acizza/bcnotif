@@ -51,7 +51,7 @@ mod windows {
     // once if creation fails
     fn inner_create(title: &str, body: &str) -> Result<(), ::winrt::Error> {
         unsafe {
-            let toast_xml = ToastNotificationManager::get_template_content(ToastTemplateType_ToastText02)?;
+            let toast_xml = ToastNotificationManager::get_template_content(ToastTemplateType::ToastText02)?;
             let toast_text_elements = toast_xml.get_elements_by_tag_name(&FastHString::new("text"))?;
 
             let add_text = |i, string| {
