@@ -23,12 +23,10 @@ pub fn display(err: &Error) {
 
     match notify::create_error(&msg) {
         Ok(_) => (),
-        Err(e) => {
+        Err(notif_err) => {
             eprintln!("failed to create error notification:");
 
-            let notif_err = Error::from(e);
             let notif_msg = build_err_msg(&notif_err);
-
             print_with_backtrace(&notif_msg, &notif_err);
         }
     }
