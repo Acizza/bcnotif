@@ -1,9 +1,6 @@
+use failure::Error;
 use feed::Feed;
 use feed::statistics::ListenerStats;
-
-#[derive(Fail, Debug)]
-#[fail(display = "failed to create notification")]
-pub struct CreationFailedError;
 
 pub enum Icon {
     Update,
@@ -16,6 +13,10 @@ mod unix {
 
     use self::notify_rust::Notification;
     use super::*;
+
+    #[derive(Fail, Debug)]
+    #[fail(display = "failed to create notification")]
+    pub struct CreationFailedError;
 
     impl Icon {
         fn get_name(&self) -> &str {
@@ -40,6 +41,7 @@ mod unix {
 
 #[cfg(windows)]
 mod windows {
+    use failure::Error;
     use ::winrt::FastHString;
     use ::winrt::windows::data::xml::dom::*;
     use ::winrt::windows::ui::notifications::*;
@@ -75,7 +77,7 @@ mod windows {
         Ok(())
     }
 
-    pub fn create(_: &Icon, title: &str, body: &str) -> super::Result<(), Error> {
+    pub fn create(_: &Icon, title: &str, body: &str) -> Result<(), Error> {
         inner_create(title, body)
             .map_err(|err| format_err!("{:?}", err))?;
 
@@ -90,7 +92,7 @@ use self::unix::create;
 use self::windows::create;
 
 pub fn create_update(index: i32, max_index: i32, feed: &Feed,
-    feed_stats: &ListenerStats) -> Result<(), CreationFailedError> {
+    feed_stats: &ListenerStats) -> Result<(), Error> {
 
     let title = format!(
         "{} - Broadcastify Update ({} of {})",
@@ -111,9 +113,9 @@ pub fn create_update(index: i32, max_index: i32, feed: &Feed,
         &alert,
         feed.id);
 
-    create(&Icon::Update, &title, &body)
+    Ok(create(&Icon::Update, &title, &body)?)
 }
 
-pub fn create_error(body: &str) -> Result<(), CreationFailedError> {
-    create(&Icon::Error, "Broadcastify Update Error", body)
+pub fn create_error(body: &str) -> Result<(), Error> {
+    Ok(create(&Icon::Error, "Broadcastify Update Error", body)?)
 }
