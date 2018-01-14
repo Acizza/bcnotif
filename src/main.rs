@@ -101,7 +101,10 @@ fn update_feed_stats<'a>(
     config: &Config,
     averages: &'a mut AverageData,
 ) -> &'a ListenerStats {
-    let stats = averages.data.entry(feed.id).or_insert_with(ListenerStats::new);
+    let stats = averages
+        .data
+        .entry(feed.id)
+        .or_insert_with(ListenerStats::new);
 
     stats.update(hour as usize, feed, config);
     stats

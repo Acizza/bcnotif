@@ -22,7 +22,7 @@ mod unix {
         fn get_name(&self) -> &str {
             match *self {
                 Icon::Update => "emblem-sound",
-                Icon::Error  => "dialog-error",
+                Icon::Error => "dialog-error",
             }
         }
     }
@@ -42,26 +42,28 @@ mod unix {
 #[cfg(windows)]
 mod windows {
     use failure::Error;
-    use ::winrt::FastHString;
-    use ::winrt::windows::data::xml::dom::*;
-    use ::winrt::windows::ui::notifications::*;
+    use winrt::FastHString;
+    use winrt::windows::data::xml::dom::*;
+    use winrt::windows::ui::notifications::*;
     use super::Icon;
 
-    // The purpose of having an inner create function is so that we only have to specify the error type
-    // once if creation fails
+    // The purpose of having an inner create function is so that we only have to specify the error
+    // type once if creation fails
     fn inner_create(title: &str, body: &str) -> Result<(), ::winrt::Error> {
         unsafe {
-            let toast_xml = ToastNotificationManager::get_template_content(ToastTemplateType::ToastText02)?;
-            let toast_text_elements = toast_xml.get_elements_by_tag_name(&FastHString::new("text"))?;
+            let toast_xml =
+                ToastNotificationManager::get_template_content(ToastTemplateType::ToastText02)?;
+                
+            let toast_text_elements =
+                toast_xml.get_elements_by_tag_name(&FastHString::new("text"))?;
 
             let add_text = |i, string| {
-                let node = &*toast_xml.create_text_node(&FastHString::new(string))?
+                let node = &*toast_xml
+                    .create_text_node(&FastHString::new(string))?
                     .query_interface::<IXmlNode>()
                     .unwrap();
 
-                toast_text_elements
-                    .item(i)?
-                    .append_child(node)
+                toast_text_elements.item(i)?.append_child(node)
             };
 
             add_text(0, title)?;
@@ -78,8 +80,7 @@ mod windows {
     }
 
     pub fn create(_: &Icon, title: &str, body: &str) -> Result<(), Error> {
-        inner_create(title, body)
-            .map_err(|err| format_err!("{:?}", err))?;
+        inner_create(title, body).map_err(|err| format_err!("{:?}", err))?;
 
         Ok(())
     }
@@ -91,18 +92,22 @@ use self::unix::create;
 #[cfg(windows)]
 use self::windows::create;
 
-pub fn create_update(index: i32, max_index: i32, feed: &Feed,
-    feed_stats: &ListenerStats) -> Result<(), Error> {
-
+pub fn create_update(
+    index: i32,
+    max_index: i32,
+    feed: &Feed,
+    feed_stats: &ListenerStats,
+) -> Result<(), Error> {
     let title = format!(
         "{} - Broadcastify Update ({} of {})",
         feed.state.abbrev,
         index,
-        max_index);
+        max_index
+    );
 
     let alert = match feed.alert {
         Some(ref alert) => format!("\nAlert: {}", alert),
-        None            => String::new(),
+        None => String::new(),
     };
 
     let body = format!(
@@ -111,7 +116,8 @@ pub fn create_update(index: i32, max_index: i32, feed: &Feed,
         feed.listeners,
         feed_stats.get_jump(feed.listeners) as i32,
         &alert,
-        feed.id);
+        feed.id
+    );
 
     Ok(create(&Icon::Update, &title, &body)?)
 }

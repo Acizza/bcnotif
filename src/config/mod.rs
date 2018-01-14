@@ -62,13 +62,13 @@ impl WeekdaySpike {
 
         for ws in weekday_spikes {
             match (weekday, ws) {
-                (Mon, &Monday(ref s)) |
-                (Tue, &Tuesday(ref s)) |
-                (Wed, &Wednesday(ref s)) |
-                (Thu, &Thursday(ref s)) |
-                (Fri, &Friday(ref s)) |
-                (Sat, &Saturday(ref s)) |
-                (Sun, &Sunday(ref s)) => return Some(s),
+                (Mon, &Monday(ref s))
+                | (Tue, &Tuesday(ref s))
+                | (Wed, &Wednesday(ref s))
+                | (Thu, &Thursday(ref s))
+                | (Fri, &Friday(ref s))
+                | (Sat, &Saturday(ref s))
+                | (Sun, &Sunday(ref s)) => return Some(s),
                 _ => (),
             }
         }
