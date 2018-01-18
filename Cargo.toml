@@ -3,6 +3,9 @@ name = "bcnotif"
 version = "0.9.0"
 authors = ["Acizza <jonathanmce@gmail.com>"]
 
+[profile.release]
+lto = true
+
 [features]
 print-feed-data = []
 
