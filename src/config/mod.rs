@@ -101,8 +101,8 @@ create_config_enum!(SortOrder,
 );
 
 create_config_struct!(Sorting,
-    sort_type:  SortType  => "Sort By"    => (SortType::Listeners),
-    sort_order: SortOrder => "Sort Order" => (SortOrder::Descending),
+    sort_type:  SortType  => "Sort By"    => { SortType::Listeners },
+    sort_order: SortOrder => "Sort Order" => { SortOrder::Descending },
 );
 
 macro_rules! gen_base_parse_stmt {
