@@ -92,9 +92,9 @@ enum FeedSource {
 impl FeedSource {
     fn get_url(&self) -> String {
         match *self {
-            FeedSource::Top => "http://broadcastify.com/listen/top".into(),
+            FeedSource::Top => "http://www.broadcastify.com/listen/top".into(),
             FeedSource::State(ref state) => {
-                format!("http://broadcastify.com/listen/stid/{}", state.id)
+                format!("http://www.broadcastify.com/listen/stid/{}", state.id)
             }
         }
     }
