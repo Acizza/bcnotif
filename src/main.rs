@@ -3,6 +3,9 @@
 #[macro_use]
 extern crate failure;
 
+#[macro_use]
+extern crate lazy_static;
+
 extern crate chrono;
 
 #[cfg(windows)]
@@ -70,7 +73,7 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
     let hour = Utc::now().hour();
     let mut display_feeds = Vec::new();
 
-    for feed in Feed::download_and_scrape(config)? {
+    for feed in feed::scrape_all(config)? {
         if feed.listeners < config.misc.minimum_listeners {
             continue;
         }

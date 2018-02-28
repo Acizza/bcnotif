@@ -13,11 +13,10 @@ pub enum ScrapeError {
     #[fail(display = "no feeds found")] NoneFound,
 }
 
-pub fn scrape_top(body: &str) -> Result<Vec<Feed>, Error> {
+pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, Error> {
     let doc = Document::from(body);
 
     let feed_data = doc.find(Class("btable").descendant(Name("tr"))).skip(1);
-
     let mut feeds = Vec::new();
 
     for row in feed_data {
@@ -66,7 +65,7 @@ pub fn scrape_top(body: &str) -> Result<Vec<Feed>, Error> {
     Ok(feeds)
 }
 
-pub fn scrape_state(state: &State, body: &str) -> Result<Vec<Feed>, Error> {
+pub fn scrape_state<'a>(state: State<'a>, body: &str) -> Result<Vec<Feed<'a>>, Error> {
     let doc = Document::from(body);
 
     // TODO: add support for areawide feeds
