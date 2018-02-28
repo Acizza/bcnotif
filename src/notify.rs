@@ -9,8 +9,8 @@ pub enum NotifyError {
     CreationFailed,
 
     #[cfg(windows)]
-    #[fail(display = "{}", _0)]
-    WinRT(#[cause] ::winrt::Error),
+    #[fail(display = "{:?}", _0)]
+    WinRT(::winrt::Error),
 }
 
 pub enum Icon {
@@ -48,11 +48,10 @@ mod unix {
 
 #[cfg(windows)]
 mod windows {
-    use failure::Error;
     use winrt::FastHString;
     use winrt::windows::data::xml::dom::*;
     use winrt::windows::ui::notifications::*;
-    use super::Icon;
+    use super::{Icon, NotifyError};
 
     // The purpose of having an inner create function is so that we only have to specify the error
     // type once if creation fails
