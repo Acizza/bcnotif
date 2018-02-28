@@ -7,6 +7,10 @@ extern crate failure;
 extern crate lazy_static;
 
 extern crate chrono;
+extern crate csv;
+extern crate reqwest;
+extern crate select;
+extern crate yaml_rust;
 
 #[cfg(windows)]
 extern crate winrt;
@@ -18,12 +22,13 @@ mod config;
 mod error;
 mod feed;
 mod notify;
+mod statistics;
 
 use config::Config;
 use chrono::{Timelike, Utc};
-use failure::Error;
+use error::Error;
 use feed::Feed;
-use feed::statistics::{AverageData, ListenerStats};
+use statistics::{AverageData, ListenerStats};
 use std::time::Duration;
 use std::path::PathBuf;
 
@@ -34,8 +39,8 @@ fn main() {
     match run() {
         Ok(_) => (),
         Err(err) => {
-            eprintln!("fatal error:");
-            error::display(&err);
+            eprintln!("error during init:");
+            error::display(&err.into());
         }
     }
 
@@ -44,25 +49,25 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
-    let exe_dir = get_exe_directory()?;
+    let exe_dir = get_exe_directory().map_err(Error::Io)?;
     let config_path = exe_dir.clone().join("config.yaml");
 
     let mut averages = AverageData::new(exe_dir.join("averages.csv"));
 
     if averages.path.exists() {
-        averages.load()?;
+        averages.load().map_err(Error::Statistics)?;
     }
 
     loop {
         let config = if !config_path.exists() {
             Config::default()
         } else {
-            Config::from_file(&config_path)?
+            Config::from_file(&config_path).map_err(Error::Config)?
         };
 
         match perform_update(&mut averages, &config) {
             Ok(_) => (),
-            Err(err) => error::display(&err),
+            Err(err) => error::display(&err.into()),
         }
 
         std::thread::sleep(Duration::from_secs((config.misc.update_time * 60.0) as u64));
@@ -73,7 +78,9 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
     let hour = Utc::now().hour();
     let mut display_feeds = Vec::new();
 
-    for feed in feed::scrape_all(config)? {
+    let feeds = feed::scrape_all(config).map_err(Error::Feed)?;
+
+    for feed in feeds {
         if feed.listeners < config.misc.minimum_listeners {
             continue;
         }
@@ -93,7 +100,7 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
 
     show_feeds(display_feeds, config)?;
 
-    averages.save()?;
+    averages.save().map_err(Error::Statistics)?;
     Ok(())
 }
 
@@ -145,7 +152,7 @@ fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>, config: &Config) -> Result<
     let total = feeds.len() as i32;
 
     for (i, (feed, stats)) in feeds.into_iter().enumerate() {
-        notify::create_update(1 + i as i32, total, &feed, &stats)?;
+        notify::create_update(1 + i as i32, total, &feed, &stats).map_err(Error::Notify)?;
     }
 
     Ok(())

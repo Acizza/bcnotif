@@ -1,11 +1,20 @@
-extern crate reqwest;
-
-pub mod statistics;
 mod scrape;
 
 use config::Config;
-use failure::{Error, ResultExt};
+use reqwest;
 use std::borrow::Cow;
+
+#[derive(Fail, Debug)]
+pub enum FeedError {
+    #[fail(display = "{}", _0)]
+    Reqwest(#[cause] ::reqwest::Error),
+
+    #[fail(display = "failed to parse top feeds")]
+    ParseTopFeeds(#[cause] ::feed::scrape::ScrapeError),
+
+    #[fail(display = "failed to parse state ({}) feeds", _1)]
+    ParseStateFeeds(#[cause] ::feed::scrape::ScrapeError, String),
+}
 
 #[derive(Debug)]
 pub struct Feed<'a> {
@@ -41,14 +50,7 @@ impl<'a> State<'a> {
     }
 }
 
-// TODO: move to scrape module (?)
-#[derive(Fail, Debug)]
-pub enum FeedSourceError {
-    #[fail(display = "failed to parse top feeds")] FailedToParseTopFeeds,
-    #[fail(display = "failed to parse state feeds")] FailedToParseStateFeeds,
-}
-
-enum FeedSource<'a> {
+pub enum FeedSource<'a> {
     Top,
     State(State<'a>),
 }
@@ -63,32 +65,23 @@ impl<'a> FeedSource<'a> {
         }
     }
 
-    fn download_page(&self, client: &reqwest::Client) -> Result<String, Error> {
+    fn download_page(&self, client: &reqwest::Client) -> reqwest::Result<String> {
         let body = client.get(self.get_url().as_ref()).send()?.text()?;
         Ok(body)
     }
 
-    fn scrape(self, client: &reqwest::Client) -> Result<Vec<Feed<'a>>, Error> {
-        let body = self.download_page(client)?;
+    fn scrape(self, client: &reqwest::Client) -> Result<Vec<Feed<'a>>, FeedError> {
+        let body = self.download_page(client).map_err(FeedError::Reqwest)?;
 
         match self {
-            FeedSource::Top => {
-                let scraped =
-                    scrape::scrape_top(&body).context(FeedSourceError::FailedToParseTopFeeds)?;
-
-                Ok(scraped)
-            }
-            FeedSource::State(state) => {
-                let scraped = scrape::scrape_state(state, &body)
-                    .context(FeedSourceError::FailedToParseStateFeeds)?;
-
-                Ok(scraped)
-            }
+            FeedSource::Top => scrape::scrape_top(&body).map_err(FeedError::ParseTopFeeds),
+            FeedSource::State(ref state) => scrape::scrape_state(state, &body)
+                .map_err(|e| FeedError::ParseStateFeeds(e, state.abbrev.to_string())),
         }
     }
 }
 
-pub fn scrape_all(config: &Config) -> Result<Vec<Feed>, Error> {
+pub fn scrape_all(config: &Config) -> Result<Vec<Feed>, FeedError> {
     lazy_static! {
         static ref CLIENT: reqwest::Client = reqwest::Client::new();
     }

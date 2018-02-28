@@ -1,13 +1,19 @@
-extern crate yaml_rust;
-
 #[macro_use]
 mod generation;
 
 use chrono::{Datelike, Local};
-use failure::Error;
 use feed::Feed;
-use self::yaml_rust::{Yaml, YamlLoader};
 use std::path::Path;
+use yaml_rust::{Yaml, YamlLoader};
+
+#[derive(Fail, Debug)]
+pub enum ConfigError {
+    #[fail(display = "{}", _0)]
+    Io(#[cause] ::std::io::Error),
+
+    #[fail(display = "YAML error: {}", _0)]
+    YAMLScan(#[cause] ::yaml_rust::ScanError),
+}
 
 create_config_struct!(Spike,
     jump:                    f32 => "Jump Required"                        => 0.3,
@@ -119,14 +125,14 @@ macro_rules! gen_base_config {
         }
 
         impl $name {
-            pub fn from_file(path: &Path) -> Result<$name, Error> {
-                let file = ::util::read_file(path)?;
+            pub fn from_file(path: &Path) -> Result<$name, ConfigError> {
+                let file = ::util::read_file(path).map_err(ConfigError::Io)?;
 
                 if file.len() == 0 {
                     return Ok(Config::default())
                 }
 
-                let doc = YamlLoader::load_from_str(&::util::read_file(path)?)?;
+                let doc = YamlLoader::load_from_str(&file).map_err(ConfigError::YAMLScan)?;
                 let doc = &doc[0]; // We only care about the first document
 
                 Ok($name {
@@ -187,7 +193,7 @@ macro_rules! impl_parseyaml_for_numeric {
         $(
         impl ParseYaml for $t {
             fn from(doc: &Yaml) -> Option<$t> {
-                use self::yaml_rust::Yaml::*;
+                use yaml_rust::Yaml::*;
                 match *doc {
                     Integer(num)     => Some(num as $t),
                     Real(ref string) => string.parse().ok(),
@@ -203,7 +209,7 @@ impl_parseyaml_for_numeric!(u8 u32 f32);
 
 impl ParseYaml for String {
     fn from(doc: &Yaml) -> Option<String> {
-        use self::yaml_rust::Yaml::*;
+        use yaml_rust::Yaml::*;
         match *doc {
             String(ref s) => Some(s.clone()),
             _ => None,

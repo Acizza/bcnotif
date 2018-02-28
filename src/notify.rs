@@ -1,7 +1,17 @@
-use failure::Error;
 use feed::Feed;
-use feed::statistics::ListenerStats;
+use statistics::ListenerStats;
 use std::borrow::Cow;
+
+#[derive(Fail, Debug)]
+pub enum NotifyError {
+    #[cfg(any(unix, macos))]
+    #[fail(display = "failed to create notification")]
+    CreationFailed,
+
+    #[cfg(windows)]
+    #[fail(display = "{}", _0)]
+    WinRT(#[cause] ::winrt::Error),
+}
 
 pub enum Icon {
     Update,
@@ -15,10 +25,6 @@ mod unix {
     use self::notify_rust::Notification;
     use super::*;
 
-    #[derive(Fail, Debug)]
-    #[fail(display = "failed to create notification")]
-    pub struct CreationFailedError;
-
     impl Icon {
         fn get_name(&self) -> &str {
             match *self {
@@ -28,13 +34,13 @@ mod unix {
         }
     }
 
-    pub fn create(icon: &Icon, title: &str, body: &str) -> Result<(), CreationFailedError> {
+    pub fn create(icon: &Icon, title: &str, body: &str) -> Result<(), NotifyError> {
         Notification::new()
             .summary(title)
             .body(body)
             .icon(icon.get_name())
             .show()
-            .map_err(|_| CreationFailedError)?;
+            .map_err(|_| NotifyError::CreationFailed)?;
 
         Ok(())
     }
@@ -80,10 +86,8 @@ mod windows {
         Ok(())
     }
 
-    pub fn create(_: &Icon, title: &str, body: &str) -> Result<(), Error> {
-        inner_create(title, body).map_err(|err| format_err!("{:?}", err))?;
-
-        Ok(())
+    pub fn create(_: &Icon, title: &str, body: &str) -> Result<(), NotifyError> {
+        inner_create(title, body).map_err(NotifyError::WinRT)
     }
 }
 
@@ -98,7 +102,7 @@ pub fn create_update(
     max_index: i32,
     feed: &Feed,
     feed_stats: &ListenerStats,
-) -> Result<(), Error> {
+) -> Result<(), NotifyError> {
     let title = format!(
         "{} - Broadcastify Update ({} of {})",
         feed.state.abbrev, index, max_index
@@ -118,11 +122,9 @@ pub fn create_update(
         feed.id
     );
 
-    create(&Icon::Update, &title, &body)?;
-    Ok(())
+    create(&Icon::Update, &title, &body)
 }
 
-pub fn create_error(body: &str) -> Result<(), Error> {
-    create(&Icon::Error, "Broadcastify Update Error", body)?;
-    Ok(())
+pub fn create_error(body: &str) -> Result<(), NotifyError> {
+    create(&Icon::Error, "Broadcastify Update Error", body)
 }

@@ -1,7 +1,25 @@
-use failure::Error;
+use failure;
 use notify;
 
-fn build_err_msg(err: &Error) -> String {
+#[derive(Fail, Debug)]
+pub enum Error {
+    #[fail(display = "{}", _0)]
+    Io(#[cause] ::std::io::Error),
+
+    #[fail(display = "config error")]
+    Config(#[cause] ::config::ConfigError),
+
+    #[fail(display = "feed error")]
+    Feed(#[cause] ::feed::FeedError),
+
+    #[fail(display = "notification error")]
+    Notify(#[cause] ::notify::NotifyError),
+
+    #[fail(display = "statistics error")]
+    Statistics(#[cause] ::statistics::StatisticsError),
+}
+
+fn build_err_msg(err: &failure::Error) -> String {
     let mut msg = format!("error: {}\n", err.cause());
 
     for cause in err.causes().skip(1) {
@@ -11,13 +29,13 @@ fn build_err_msg(err: &Error) -> String {
     msg
 }
 
-fn print_with_backtrace(msg: &str, err: &Error) {
+fn print_with_backtrace(msg: &str, err: &failure::Error) {
     eprintln!("{}", msg);
     eprintln!("{}", err.backtrace());
 }
 
 /// Displays the provided error with a notification and by writing it to the terminal
-pub fn display(err: &Error) {
+pub fn display(err: &failure::Error) {
     let msg = build_err_msg(err);
     print_with_backtrace(&msg, err);
 
@@ -25,7 +43,8 @@ pub fn display(err: &Error) {
         Ok(_) => (),
         Err(notif_err) => {
             eprintln!("failed to create error notification:");
-
+            
+            let notif_err = notif_err.into();
             let notif_msg = build_err_msg(&notif_err);
             print_with_backtrace(&notif_msg, &notif_err);
         }

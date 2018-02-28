@@ -1,19 +1,23 @@
-extern crate select;
-
-use failure::{Error, ResultExt};
 use feed::{Feed, State};
-use self::select::document::Document;
-use self::select::node::Node;
-use self::select::predicate::{Class, Name, Predicate};
+use select::document::Document;
+use select::node::Node;
+use select::predicate::{Class, Name, Predicate};
+
+type ElementName = &'static str;
 
 #[derive(Fail, Debug)]
 pub enum ScrapeError {
-    #[fail(display = "unable to find element that contains {} information", _0)] NoElement(String),
-    #[fail(display = "unable to parse {} information", _0)] FailedConvert(String),
-    #[fail(display = "no feeds found")] NoneFound,
+    #[fail(display = "unable to find element that contains {} information", _0)]
+    NoElement(ElementName),
+
+    #[fail(display = "unable to parse {} information", _1)]
+    FailedIntParse(#[cause] ::std::num::ParseIntError, ElementName),
+
+    #[fail(display = "no feeds found")]
+    NoneFound,
 }
 
-pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, Error> {
+pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, ScrapeError> {
     let doc = Document::from(body);
 
     let feed_data = doc.find(Class("btable").descendant(Name("tr"))).skip(1);
@@ -26,7 +30,7 @@ pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, Error> {
         // so we can't assume their location
         let location_info = row.find(Name("td"))
             .nth(1)
-            .ok_or_else(|| ScrapeError::NoElement("location".into()))?;
+            .ok_or_else(|| ScrapeError::NoElement("location"))?;
 
         let mut hyperlinks = location_info
             .find(Name("a"))
@@ -34,12 +38,12 @@ pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, Error> {
 
         let (state_link, state_abbrev) = hyperlinks
             .next()
-            .ok_or_else(|| ScrapeError::NoElement("state data".into()))?;
+            .ok_or_else(|| ScrapeError::NoElement("state data"))?;
 
         let state_id = parse_link_id(state_link)
-            .ok_or_else(|| ScrapeError::NoElement("state id".into()))?
+            .ok_or_else(|| ScrapeError::NoElement("state id"))?
             .parse::<u32>()
-            .context(ScrapeError::FailedConvert("state id".into()))?;
+            .map_err(|e| ScrapeError::FailedIntParse(e, "state id"))?;
 
         let county = match hyperlinks.next() {
             Some((link, ref text)) if link.starts_with("/listen/ctid") => text.clone(),
@@ -59,13 +63,13 @@ pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, Error> {
     }
 
     if feeds.is_empty() {
-        bail!(ScrapeError::NoneFound);
+        return Err(ScrapeError::NoneFound);
     }
 
     Ok(feeds)
 }
 
-pub fn scrape_state<'a>(state: State<'a>, body: &str) -> Result<Vec<Feed<'a>>, Error> {
+pub fn scrape_state<'a>(state: &State<'a>, body: &str) -> Result<Vec<Feed<'a>>, ScrapeError> {
     let doc = Document::from(body);
 
     // TODO: add support for areawide feeds
@@ -76,7 +80,7 @@ pub fn scrape_state<'a>(state: State<'a>, body: &str) -> Result<Vec<Feed<'a>>, E
         let tables = doc.find(Class("btable")).take(2).collect::<Vec<_>>();
 
         if tables.is_empty() {
-            bail!(ScrapeError::NoElement("feed data".into()));
+            return Err(ScrapeError::NoElement("feed data"));
         } else if tables.len() >= 2 {
             tables[1]
         } else {
@@ -111,35 +115,35 @@ pub fn scrape_state<'a>(state: State<'a>, body: &str) -> Result<Vec<Feed<'a>>, E
     }
 
     if feeds.is_empty() {
-        bail!(ScrapeError::NoneFound);
+        return Err(ScrapeError::NoneFound);
     }
 
     Ok(feeds)
 }
 
-fn parse_id_and_name(node: &Node, class_name: &str) -> Result<(u32, String), Error> {
+fn parse_id_and_name(node: &Node, class_name: &str) -> Result<(u32, String), ScrapeError> {
     let base = node.find(Class(class_name).descendant(Name("a")))
         .next()
-        .ok_or_else(|| ScrapeError::NoElement("id and name".into()))?;
+        .ok_or_else(|| ScrapeError::NoElement("id and name"))?;
 
     let id = base.attr("href")
         .and_then(parse_link_id)
-        .ok_or_else(|| ScrapeError::NoElement("feed id".into()))?
+        .ok_or_else(|| ScrapeError::NoElement("feed id"))?
         .parse::<u32>()
-        .context(ScrapeError::FailedConvert("state id".into()))?;
+        .map_err(|e| ScrapeError::FailedIntParse(e, "state id"))?;
 
     Ok((id, base.text()))
 }
 
-fn parse_listeners(node: &Node) -> Result<u32, Error> {
+fn parse_listeners(node: &Node) -> Result<u32, ScrapeError> {
     let text = node.find(Class("c").and(Class("m")))
         .next()
         .map(|node| node.text())
-        .ok_or_else(|| ScrapeError::NoElement("feed listeners".into()))?;
+        .ok_or_else(|| ScrapeError::NoElement("feed listeners"))?;
 
     let result = text.trim_right()
         .parse::<u32>()
-        .context(ScrapeError::FailedConvert("feed listeners".into()))?;
+        .map_err(|e| ScrapeError::FailedIntParse(e, "feed listeners"))?;
 
     Ok(result)
 }

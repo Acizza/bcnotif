@@ -1,15 +1,26 @@
-extern crate csv;
-
 use config::Config;
 use chrono::{Timelike, Utc};
-use failure::Error;
+use csv;
 use feed::Feed;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Fail, Debug)]
-pub enum AverageDataError {
-    #[fail(display = "csv file contains record with too few rows")] TooFewRows,
+pub enum StatisticsError {
+    #[fail(display = "CSV error")]
+    CSV(#[cause] ::csv::Error),
+
+    #[fail(display = "{}", _0)]
+    Io(#[cause] ::std::io::Error),
+
+    #[fail(display = "{}", _0)]
+    ParseIntError(#[cause] ::std::num::ParseIntError),
+
+    #[fail(display = "{}", _0)]
+    ParseFloatError(#[cause] ::std::num::ParseFloatError),
+
+    #[fail(display = "CSV file contains record with too few rows")]
+    TooFewRows,
 }
 
 type FeedID = u32;
@@ -30,23 +41,25 @@ impl AverageData {
         }
     }
 
-    pub fn load(&mut self) -> Result<(), Error> {
+    pub fn load(&mut self) -> Result<(), StatisticsError> {
         let hour = Utc::now().hour() as usize;
-        let mut rdr = csv::Reader::from_path(&self.path)?;
+        let mut rdr = csv::Reader::from_path(&self.path).map_err(StatisticsError::CSV)?;
 
         for result in rdr.records() {
-            let record = result?;
+            let record = result.map_err(StatisticsError::CSV)?;
 
             if record.len() < 1 + ListenerStats::HOURLY_SIZE {
-                bail!(AverageDataError::TooFewRows);
+                return Err(StatisticsError::TooFewRows);
             }
 
-            let id = record[0].parse()?;
+            let id = record[0].parse().map_err(StatisticsError::ParseIntError)?;
             let mut averages = [0.0; ListenerStats::HOURLY_SIZE];
 
             for i in 0..ListenerStats::HOURLY_SIZE {
                 // Use an offset of 1 to avoid capturing the feed ID field
-                averages[i] = record[1 + i].parse::<f32>()?;
+                averages[i] = record[1 + i]
+                    .parse::<f32>()
+                    .map_err(StatisticsError::ParseFloatError)?;
             }
 
             let listeners = averages[hour] as i32;
@@ -64,8 +77,8 @@ impl AverageData {
         Ok(())
     }
 
-    pub fn save(&self) -> Result<(), csv::Error> {
-        let mut wtr = csv::Writer::from_path(&self.path)?;
+    pub fn save(&self) -> Result<(), StatisticsError> {
+        let mut wtr = csv::Writer::from_path(&self.path).map_err(StatisticsError::CSV)?;
         let mut fields = Vec::with_capacity(1 + ListenerStats::HOURLY_SIZE);
 
         for (id, stats) in &self.data {
@@ -75,11 +88,11 @@ impl AverageData {
                 fields.push(average.round().to_string());
             }
 
-            wtr.write_record(&fields)?;
+            wtr.write_record(&fields).map_err(StatisticsError::CSV)?;
             fields.clear();
         }
 
-        wtr.flush()?;
+        wtr.flush().map_err(StatisticsError::Io)?;
         Ok(())
     }
 }
