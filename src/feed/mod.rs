@@ -5,6 +5,7 @@ mod scrape;
 
 use config::Config;
 use failure::{Error, ResultExt};
+use std::borrow::Cow;
 
 #[derive(Debug, Clone)]
 pub struct State {
@@ -89,17 +90,17 @@ enum FeedSource {
 }
 
 impl FeedSource {
-    fn get_url(&self) -> String {
+    fn get_url(&self) -> Cow<str> {
         match *self {
             FeedSource::Top => "http://www.broadcastify.com/listen/top".into(),
             FeedSource::State(ref state) => {
-                format!("http://www.broadcastify.com/listen/stid/{}", state.id)
+                format!("http://www.broadcastify.com/listen/stid/{}", state.id).into()
             }
         }
     }
 
     fn download_page(&self, client: &reqwest::Client) -> Result<String, Error> {
-        let body = client.get(&self.get_url()).send()?.text()?;
+        let body = client.get(self.get_url().as_ref()).send()?.text()?;
         Ok(body)
     }
 
