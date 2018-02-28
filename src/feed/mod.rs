@@ -5,7 +5,6 @@ mod scrape;
 
 use config::Config;
 use failure::{Error, ResultExt};
-use std::io::Read;
 
 #[derive(Debug, Clone)]
 pub struct State {
@@ -100,11 +99,7 @@ impl FeedSource {
     }
 
     fn download_page(&self, client: &reqwest::Client) -> Result<String, Error> {
-        let mut resp = client.get(&self.get_url()).send()?;
-        let mut body = String::new();
-
-        resp.read_to_string(&mut body)?;
-
+        let body = client.get(&self.get_url()).send()?.text()?;
         Ok(body)
     }
 
