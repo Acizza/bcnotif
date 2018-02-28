@@ -48,10 +48,10 @@ pub fn scrape_top(body: &str) -> Result<Vec<Feed>, Error> {
         };
 
         feeds.push(Feed {
-            id: id,
+            id,
             state: State::new(state_id, state_abbrev),
-            county: county,
-            name: name,
+            county,
+            name,
             listeners: parse_listeners(&row)?,
             alert: row.find(Class("messageBox"))
                 .next()
@@ -102,12 +102,12 @@ pub fn scrape_state(state: &State, body: &str) -> Result<Vec<Feed>, Error> {
             .map(|alert| alert.text());
 
         feeds.push(Feed {
-            id: id,
+            id,
             state: state.clone(),
-            county: county,
-            name: name,
+            county,
+            name,
             listeners: parse_listeners(&feed)?,
-            alert: alert,
+            alert,
         });
     }
 

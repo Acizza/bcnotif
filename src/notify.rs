@@ -117,9 +117,11 @@ pub fn create_update(
         feed.id
     );
 
-    Ok(create(&Icon::Update, &title, &body)?)
+    create(&Icon::Update, &title, &body)?;
+    Ok(())
 }
 
 pub fn create_error(body: &str) -> Result<(), Error> {
-    Ok(create(&Icon::Error, "Broadcastify Update Error", body)?)
+    create(&Icon::Error, "Broadcastify Update Error", body)?;
+    Ok(())
 }
