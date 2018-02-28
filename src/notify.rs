@@ -1,6 +1,7 @@
 use failure::Error;
 use feed::Feed;
 use feed::statistics::ListenerStats;
+use std::borrow::Cow;
 
 pub enum Icon {
     Update,
@@ -104,8 +105,8 @@ pub fn create_update(
     );
 
     let alert = match feed.alert {
-        Some(ref alert) => format!("\nAlert: {}", alert),
-        None => String::new(),
+        Some(ref alert) => Cow::Owned(format!("\nAlert: {}", alert)),
+        None => Cow::Borrowed(""),
     };
 
     let body = format!(
