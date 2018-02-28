@@ -53,7 +53,7 @@ mod windows {
         unsafe {
             let toast_xml =
                 ToastNotificationManager::get_template_content(ToastTemplateType::ToastText02)?;
-                
+
             let toast_text_elements =
                 toast_xml.get_elements_by_tag_name(&FastHString::new("text"))?;
 
@@ -100,9 +100,7 @@ pub fn create_update(
 ) -> Result<(), Error> {
     let title = format!(
         "{} - Broadcastify Update ({} of {})",
-        feed.state.abbrev,
-        index,
-        max_index
+        feed.state.abbrev, index, max_index
     );
 
     let alert = match feed.alert {

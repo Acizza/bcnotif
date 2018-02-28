@@ -117,7 +117,7 @@ macro_rules! create_config_enum {
                     }
                 }
                 )+
-                
+
                 None
             }
         }
