@@ -14,7 +14,6 @@ mod util;
 mod config;
 mod error;
 mod feed;
-mod math;
 mod notify;
 
 use config::Config;
@@ -155,9 +154,7 @@ fn print_info(feed: &Feed, stats: &ListenerStats) {
 
     println!(
         "\taverage lis. | cur: {} last: {} samples: {:?}",
-        stats.average.current,
-        stats.average.last,
-        stats.average.data
+        stats.average.current, stats.average.last, stats.average.data
     );
 
     println!("\tunskewed avg | {:?}", stats.unskewed_average);

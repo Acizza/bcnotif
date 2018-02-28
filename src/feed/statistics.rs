@@ -6,7 +6,6 @@ use failure::Error;
 use feed::Feed;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use math;
 
 #[derive(Fail, Debug)]
 pub enum AverageDataError {
@@ -238,7 +237,7 @@ impl ListenerStats {
             // Otherwise, if there isn't a huge jump in listeners, slowly increase
             // the unskewed average to adjust to natural listener increases
             if listeners - unskewed < unskewed * config.unskewed_avg.jump_required {
-                self.unskewed_average = Some(math::lerp(
+                self.unskewed_average = Some(lerp(
                     unskewed,
                     self.average.current,
                     config.unskewed_avg.adjust_pcnt,
@@ -267,4 +266,8 @@ impl ListenerStats {
     pub fn get_jump(&self, listeners: u32) -> f32 {
         listeners as f32 - self.get_unskewed_avg()
     }
+}
+
+fn lerp(v0: f32, v1: f32, t: f32) -> f32 {
+    (1. - t) * v0 + t * v1
 }
