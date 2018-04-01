@@ -53,6 +53,12 @@ mod windows {
     use winrt::windows::ui::notifications::*;
     use super::{Icon, NotifyError};
 
+    // https://stackoverflow.com/a/46817674
+    //
+    // The Toast Notification Manager needs a valid app ID for any notifications to actually display,
+    // so we'll use one that is already defined since it is not worth the effort to create one ourselves.
+    const APP_ID: &str = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe";
+
     // The purpose of having an inner create function is so that we only have to specify the error
     // type once if creation fails
     fn inner_create(title: &str, body: &str) -> Result<(), ::winrt::Error> {
@@ -76,9 +82,8 @@ mod windows {
             add_text(1, body)?;
 
             let toast = ToastNotification::create_toast_notification(&*toast_xml)?;
-            let id = env!("CARGO_PKG_NAME");
 
-            ToastNotificationManager::create_toast_notifier_with_id(&FastHString::new(id))?
+            ToastNotificationManager::create_toast_notifier_with_id(&FastHString::new(APP_ID))?
                 .show(&*toast)?;
         }
 
