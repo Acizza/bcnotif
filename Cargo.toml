@@ -22,5 +22,5 @@ yaml-rust   = "0.4"
 notify-rust = "3"
 
 [target.'cfg(windows)'.dependencies.winrt]
-version = "0.4"
+version = "0.5"
 features = ["windows-data", "windows-ui"]
