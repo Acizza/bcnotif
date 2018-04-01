@@ -59,8 +59,8 @@ mod windows {
     // so we'll use one that is already defined since it is not worth the effort to create one ourselves.
     const APP_ID: &str = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe";
 
-    // The purpose of having an inner create function is so that we only have to specify the error
-    // type once if creation fails
+    // Having this inner function will allow us to easily map all returned errors into the appropriate
+    // "wrapper" error type with the create() function
     fn inner_create(title: &str, body: &str) -> Result<(), ::winrt::Error> {
         unsafe {
             let toast_xml =
