@@ -1,20 +1,6 @@
+use error::NotifyError;
 use feed::{Feed, statistics::ListenerStats};
 use std::borrow::Cow;
-
-#[derive(Fail, Debug)]
-pub enum NotifyError {
-    #[cfg(any(unix, macos))]
-    #[fail(display = "failed to create notification")]
-    CreationFailed,
-
-    #[cfg(windows)]
-    #[fail(display = "{:?}", _0)]
-    WinRT(::winrt::Error),
-
-    #[cfg(windows)]
-    #[fail(display = "notification element is null: {}", _0)]
-    NullElement(String),
-}
 
 pub enum Icon {
     Update,

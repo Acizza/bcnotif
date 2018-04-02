@@ -6,15 +6,6 @@ use feed::Feed;
 use std::path::Path;
 use yaml_rust::{Yaml, YamlLoader};
 
-#[derive(Fail, Debug)]
-pub enum ConfigError {
-    #[fail(display = "{}", _0)]
-    Io(#[cause] ::std::io::Error),
-
-    #[fail(display = "YAML error: {}", _0)]
-    YAMLScan(#[cause] ::yaml_rust::ScanError),
-}
-
 create_config_struct!(Spike,
     jump:                    f32 => "Jump Required"                        => 0.3,
     low_listener_increase:   f32 => "Low Listener Increase"                => [0.0, 0.005],
@@ -125,14 +116,14 @@ macro_rules! gen_base_config {
         }
 
         impl $name {
-            pub fn from_file(path: &Path) -> Result<$name, ConfigError> {
-                let file = ::util::read_file(path).map_err(ConfigError::Io)?;
+            pub fn from_file(path: &Path) -> Result<$name, ::error::ConfigError> {
+                let file = ::util::read_file(path).map_err(::error::ConfigError::Io)?;
 
                 if file.len() == 0 {
                     return Ok(Config::default())
                 }
 
-                let doc = YamlLoader::load_from_str(&file).map_err(ConfigError::YAMLScan)?;
+                let doc = YamlLoader::load_from_str(&file).map_err(::error::ConfigError::YAMLScan)?;
                 let doc = &doc[0]; // We only care about the first document
 
                 Ok($name {

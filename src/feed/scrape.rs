@@ -1,21 +1,8 @@
+use error::ScrapeError;
 use feed::{Feed, State};
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Class, Name, Predicate};
-
-type ElementName = &'static str;
-
-#[derive(Fail, Debug)]
-pub enum ScrapeError {
-    #[fail(display = "unable to find element that contains {} information", _0)]
-    NoElement(ElementName),
-
-    #[fail(display = "unable to parse {} information", _1)]
-    FailedIntParse(#[cause] ::std::num::ParseIntError, ElementName),
-
-    #[fail(display = "no feeds found")]
-    NoneFound,
-}
 
 pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, ScrapeError> {
     let doc = Document::from(body);

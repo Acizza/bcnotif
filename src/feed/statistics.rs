@@ -1,27 +1,10 @@
 use config::Config;
 use chrono::{Timelike, Utc};
 use csv;
+use error::StatisticsError;
 use feed::Feed;
 use std::collections::HashMap;
 use std::path::PathBuf;
-
-#[derive(Fail, Debug)]
-pub enum StatisticsError {
-    #[fail(display = "CSV error")]
-    CSV(#[cause] ::csv::Error),
-
-    #[fail(display = "{}", _0)]
-    Io(#[cause] ::std::io::Error),
-
-    #[fail(display = "{}", _0)]
-    ParseIntError(#[cause] ::std::num::ParseIntError),
-
-    #[fail(display = "{}", _0)]
-    ParseFloatError(#[cause] ::std::num::ParseFloatError),
-
-    #[fail(display = "CSV file contains record with too few rows")]
-    TooFewRows,
-}
 
 type FeedID = u32;
 

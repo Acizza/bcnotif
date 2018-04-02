@@ -3,20 +3,9 @@ pub mod statistics;
 mod scrape;
 
 use config::Config;
+use error::FeedError;
 use reqwest;
 use std::borrow::Cow;
-
-#[derive(Fail, Debug)]
-pub enum FeedError {
-    #[fail(display = "{}", _0)]
-    Reqwest(#[cause] ::reqwest::Error),
-
-    #[fail(display = "failed to parse top feeds")]
-    ParseTopFeeds(#[cause] ::feed::scrape::ScrapeError),
-
-    #[fail(display = "failed to parse state ({}) feeds", _1)]
-    ParseStateFeeds(#[cause] ::feed::scrape::ScrapeError, String),
-}
 
 #[derive(Debug)]
 pub struct Feed<'a> {
