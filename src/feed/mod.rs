@@ -4,6 +4,8 @@ mod scrape;
 
 use config::Config;
 use error::FeedError;
+use feed::statistics::ListenerStats;
+use notify::{self, Icon};
 use reqwest;
 use std::borrow::Cow;
 
@@ -15,6 +17,36 @@ pub struct Feed<'a> {
     pub state: State<'a>,
     pub county: String,
     pub alert: Option<String>,
+}
+
+impl<'a> Feed<'a> {
+    pub fn show_notification(
+        &self,
+        stats: &ListenerStats,
+        index: u32,
+        max_index: u32,
+    ) -> Result<(), FeedError> {
+        let title = format!(
+            "{} - Broadcastify Update ({} of {})",
+            self.state.abbrev, index, max_index
+        );
+
+        let alert = match self.alert {
+            Some(ref alert) => Cow::Owned(format!("\nAlert: {}", alert)),
+            None => Cow::Borrowed(""),
+        };
+
+        let body = format!(
+            "Name: {}\nListeners: {} (^{}){}\nLink: http://broadcastify.com/listen/feed/{}",
+            self.name,
+            self.listeners,
+            stats.get_jump(self.listeners) as i32,
+            &alert,
+            self.id
+        );
+
+        notify::create(&Icon::Update, &title, &body).map_err(FeedError::NotifyError)
+    }
 }
 
 impl<'a> PartialEq for Feed<'a> {

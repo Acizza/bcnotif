@@ -147,10 +147,10 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
 fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>, config: &Config) -> Result<(), Error> {
     sort_feeds(&mut feeds, config);
 
-    let total = feeds.len() as i32;
+    let total_feeds = feeds.len() as u32;
 
     for (i, (feed, stats)) in feeds.into_iter().enumerate() {
-        notify::create_update(1 + i as i32, total, &feed, &stats).map_err(Error::Notify)?;
+        feed.show_notification(&stats, 1 + i as u32, total_feeds).map_err(Error::Feed)?;
     }
 
     Ok(())

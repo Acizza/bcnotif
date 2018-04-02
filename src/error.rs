@@ -12,15 +12,15 @@ pub enum Error {
     #[fail(display = "feed error")]
     Feed(#[cause] FeedError),
 
-    #[fail(display = "notification error")]
-    Notify(#[cause] NotifyError),
-
     #[fail(display = "statistics error")]
     Statistics(#[cause] StatisticsError),
 }
 
 #[derive(Fail, Debug)]
 pub enum FeedError {
+    #[fail(display = "{}", _0)]
+    NotifyError(#[cause] NotifyError),
+
     #[fail(display = "{}", _0)]
     Reqwest(#[cause] ::reqwest::Error),
 

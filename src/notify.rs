@@ -1,6 +1,4 @@
 use error::NotifyError;
-use feed::{Feed, statistics::ListenerStats};
-use std::borrow::Cow;
 
 pub enum Icon {
     Update,
@@ -92,38 +90,10 @@ mod windows {
 }
 
 #[cfg(any(unix, macos))]
-use self::unix::create;
+pub use self::unix::create;
 
 #[cfg(windows)]
-use self::windows::create;
-
-pub fn create_update(
-    index: i32,
-    max_index: i32,
-    feed: &Feed,
-    feed_stats: &ListenerStats,
-) -> Result<(), NotifyError> {
-    let title = format!(
-        "{} - Broadcastify Update ({} of {})",
-        feed.state.abbrev, index, max_index
-    );
-
-    let alert = match feed.alert {
-        Some(ref alert) => Cow::Owned(format!("\nAlert: {}", alert)),
-        None => Cow::Borrowed(""),
-    };
-
-    let body = format!(
-        "Name: {}\nListeners: {} (^{}){}\nLink: http://broadcastify.com/listen/feed/{}",
-        feed.name,
-        feed.listeners,
-        feed_stats.get_jump(feed.listeners) as i32,
-        &alert,
-        feed.id
-    );
-
-    create(&Icon::Update, &title, &body)
-}
+pub use self::windows::create;
 
 pub fn create_error(body: &str) -> Result<(), NotifyError> {
     create(&Icon::Error, "Broadcastify Update Error", body)
