@@ -3,7 +3,7 @@ use notify;
 
 #[derive(Fail, Debug)]
 pub enum Error {
-    #[fail(display = "{}", _0)]
+    #[fail(display = "io error")]
     Io(#[cause] ::std::io::Error),
 
     #[fail(display = "config error")]
@@ -18,10 +18,10 @@ pub enum Error {
 
 #[derive(Fail, Debug)]
 pub enum FeedError {
-    #[fail(display = "{}", _0)]
+    #[fail(display = "notification error")]
     NotifyError(#[cause] NotifyError),
 
-    #[fail(display = "{}", _0)]
+    #[fail(display = "HTTP error")]
     Reqwest(#[cause] ::reqwest::Error),
 
     #[fail(display = "failed to parse top feeds")]
@@ -50,13 +50,13 @@ pub enum StatisticsError {
     #[fail(display = "CSV error")]
     CSV(#[cause] ::csv::Error),
 
-    #[fail(display = "{}", _0)]
+    #[fail(display = "io error")]
     Io(#[cause] ::std::io::Error),
 
-    #[fail(display = "{}", _0)]
+    #[fail(display = "failed to parse integer")]
     ParseIntError(#[cause] ::std::num::ParseIntError),
 
-    #[fail(display = "{}", _0)]
+    #[fail(display = "failed to parse float")]
     ParseFloatError(#[cause] ::std::num::ParseFloatError),
 
     #[fail(display = "CSV file contains record with too few rows")]
@@ -65,12 +65,12 @@ pub enum StatisticsError {
 
 #[derive(Fail, Debug)]
 pub enum NotifyError {
-    #[cfg(any(unix, macos))]
+    #[cfg(not(windows))]
     #[fail(display = "failed to create notification")]
     CreationFailed,
 
     #[cfg(windows)]
-    #[fail(display = "{:?}", _0)]
+    #[fail(display = "WinRT error")]
     WinRT(::winrt::Error),
 
     #[cfg(windows)]
@@ -80,10 +80,10 @@ pub enum NotifyError {
 
 #[derive(Fail, Debug)]
 pub enum ConfigError {
-    #[fail(display = "{}", _0)]
+    #[fail(display = "io error")]
     Io(#[cause] ::std::io::Error),
 
-    #[fail(display = "YAML error: {}", _0)]
+    #[fail(display = "error parsing YAML")]
     YAMLScan(#[cause] ::yaml_rust::ScanError),
 }
 
