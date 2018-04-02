@@ -39,13 +39,13 @@ impl<'a> Feed<'a> {
         };
 
         let body = format!(
-            "Name: {}\nListeners: {} (^{}){}\nLink: {}/listen/feed/{}",
-            self.name,
-            self.listeners,
-            stats.get_jump(self.listeners) as i32,
-            &alert,
-            BROADCASTIFY_URL,
-            self.id
+            "Name: {name}\nListeners: {listeners} (^{jump}){alert}\nLink: {url}/listen/feed/{feed_id}",
+            name = self.name,
+            listeners = self.listeners,
+            jump = stats.get_jump(self.listeners) as i32,
+            alert = &alert,
+            url = BROADCASTIFY_URL,
+            feed_id = self.id
         );
 
         notify::create(&Icon::Update, &title, &body).map_err(FeedError::NotifyError)
