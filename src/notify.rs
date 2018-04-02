@@ -1,5 +1,4 @@
-use feed::Feed;
-use statistics::ListenerStats;
+use feed::{Feed, statistics::ListenerStats};
 use std::borrow::Cow;
 
 #[derive(Fail, Debug)]

@@ -1,3 +1,5 @@
+pub mod statistics;
+
 mod scrape;
 
 use config::Config;

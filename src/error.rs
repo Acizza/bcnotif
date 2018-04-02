@@ -16,7 +16,7 @@ pub enum Error {
     Notify(#[cause] ::notify::NotifyError),
 
     #[fail(display = "statistics error")]
-    Statistics(#[cause] ::statistics::StatisticsError),
+    Statistics(#[cause] ::feed::statistics::StatisticsError),
 }
 
 fn build_err_msg(err: &failure::Error) -> String {

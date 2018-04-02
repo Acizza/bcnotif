@@ -22,13 +22,11 @@ mod config;
 mod error;
 mod feed;
 mod notify;
-mod statistics;
 
 use config::Config;
 use chrono::{Timelike, Utc};
 use error::Error;
-use feed::Feed;
-use statistics::{AverageData, ListenerStats};
+use feed::{Feed, statistics::{AverageData, ListenerStats}};
 use std::time::Duration;
 use std::path::PathBuf;
 
