@@ -9,6 +9,8 @@ use notify::{self, Icon};
 use reqwest;
 use std::borrow::Cow;
 
+pub const BROADCASTIFY_URL: &str = "https://www.broadcastify.com";
+
 #[derive(Debug)]
 pub struct Feed<'a> {
     pub id: u32,
@@ -37,11 +39,12 @@ impl<'a> Feed<'a> {
         };
 
         let body = format!(
-            "Name: {}\nListeners: {} (^{}){}\nLink: http://broadcastify.com/listen/feed/{}",
+            "Name: {}\nListeners: {} (^{}){}\nLink: {}/listen/feed/{}",
             self.name,
             self.listeners,
             stats.get_jump(self.listeners) as i32,
             &alert,
+            BROADCASTIFY_URL,
             self.id
         );
 
@@ -79,17 +82,21 @@ pub enum FeedSource<'a> {
 }
 
 impl<'a> FeedSource<'a> {
-    fn get_url(&self) -> Cow<str> {
+    fn get_url(&self) -> String {
         match *self {
-            FeedSource::Top => "http://www.broadcastify.com/listen/top".into(),
+            FeedSource::Top => {
+                // This should be be converted to use the concat! macro if it
+                // ever gains support for constants
+                format!("{}/listen/top", BROADCASTIFY_URL)
+            }
             FeedSource::State(ref state) => {
-                format!("http://www.broadcastify.com/listen/stid/{}", state.id).into()
+                format!("{}/listen/stid/{}", BROADCASTIFY_URL, state.id)
             }
         }
     }
 
     fn download_page(&self, client: &reqwest::Client) -> reqwest::Result<String> {
-        let body = client.get(self.get_url().as_ref()).send()?.text()?;
+        let body = client.get(&self.get_url()).send()?.text()?;
         Ok(body)
     }
 
