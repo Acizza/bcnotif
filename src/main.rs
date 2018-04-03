@@ -76,14 +76,14 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
     let hour = Utc::now().hour() as usize;
     let mut display_feeds = Vec::new();
 
-    let feeds = feed::scrape_all(config).map_err(Error::Feed)?;
+    let feeds = feed::scrape_all(config)
+        .map_err(Error::Feed)?
+        .into_iter()
+        .filter(|feed| feed.listeners >= config.misc.minimum_listeners);
 
     for feed in feeds {
-        if feed.listeners < config.misc.minimum_listeners {
-            continue;
-        }
-
-        let stats = averages.update_feed_stats(&feed, config, hour);
+        let stats = averages.get_feed_stats(&feed);
+        stats.update(hour, &feed, config);
 
         if cfg!(feature = "print-feed-data") {
             print_info(&feed, stats);
@@ -96,7 +96,8 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
         }
     }
 
-    show_feeds(display_feeds, config)?;
+    sort_feeds(&mut display_feeds, config);
+    show_feeds(&display_feeds)?;
 
     averages.save().map_err(Error::Statistics)?;
     Ok(())
@@ -111,11 +112,8 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
             SortOrder::Descending => (y, x),
         };
 
-        let x_feed = &x.0;
-        let x_stats = &x.1;
-
-        let y_feed = &y.0;
-        let y_stats = &y.1;
+        let &(ref x_feed, ref x_stats) = x;
+        let &(ref y_feed, ref y_stats) = y;
 
         match config.sorting.sort_type {
             SortType::Listeners => x_feed.listeners.cmp(&y_feed.listeners),
@@ -129,13 +127,11 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
     });
 }
 
-fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>, config: &Config) -> Result<(), Error> {
-    sort_feeds(&mut feeds, config);
-
+fn show_feeds(feeds: &[(Feed, ListenerStats)]) -> Result<(), Error> {
     let total_feeds = feeds.len() as u32;
 
-    for (i, (feed, stats)) in feeds.into_iter().enumerate() {
-        feed.show_notification(&stats, 1 + i as u32, total_feeds)
+    for (i, &(ref feed, ref stats)) in feeds.iter().enumerate() {
+        feed.show_notification(stats, 1 + i as u32, total_feeds)
             .map_err(Error::Feed)?;
     }
 
