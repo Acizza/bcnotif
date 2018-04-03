@@ -73,7 +73,7 @@ fn run() -> Result<(), Error> {
 }
 
 fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Error> {
-    let hour = Utc::now().hour();
+    let hour = Utc::now().hour() as usize;
     let mut display_feeds = Vec::new();
 
     let feeds = feed::scrape_all(config).map_err(Error::Feed)?;
@@ -83,7 +83,7 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
             continue;
         }
 
-        let stats = update_feed_stats(hour, &feed, config, averages);
+        let stats = averages.update_feed_stats(&feed, config, hour);
 
         if cfg!(feature = "print-feed-data") {
             print_info(&feed, stats);
@@ -100,21 +100,6 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
 
     averages.save().map_err(Error::Statistics)?;
     Ok(())
-}
-
-fn update_feed_stats<'a>(
-    hour: u32,
-    feed: &Feed,
-    config: &Config,
-    averages: &'a mut AverageData,
-) -> &'a ListenerStats {
-    let stats = averages
-        .data
-        .entry(feed.id)
-        .or_insert_with(ListenerStats::new);
-
-    stats.update(hour as usize, feed, config);
-    stats
 }
 
 fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
@@ -150,7 +135,8 @@ fn show_feeds(mut feeds: Vec<(Feed, ListenerStats)>, config: &Config) -> Result<
     let total_feeds = feeds.len() as u32;
 
     for (i, (feed, stats)) in feeds.into_iter().enumerate() {
-        feed.show_notification(&stats, 1 + i as u32, total_feeds).map_err(Error::Feed)?;
+        feed.show_notification(&stats, 1 + i as u32, total_feeds)
+            .map_err(Error::Feed)?;
     }
 
     Ok(())

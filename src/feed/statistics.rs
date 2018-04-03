@@ -78,6 +78,17 @@ impl AverageData {
         wtr.flush().map_err(StatisticsError::Io)?;
         Ok(())
     }
+
+    pub fn update_feed_stats<'a>(
+        &'a mut self,
+        feed: &Feed,
+        config: &Config,
+        hour: usize,
+    ) -> &'a ListenerStats {
+        let stats = self.data.entry(feed.id).or_insert_with(ListenerStats::new);
+        stats.update(hour, feed, config);
+        stats
+    }
 }
 
 /// Represents an average set of data that wraps around its specified sample size.
