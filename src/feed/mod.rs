@@ -9,7 +9,7 @@ use notify::{self, Icon};
 use reqwest;
 use std::borrow::Cow;
 
-pub const BROADCASTIFY_URL: &str = "https://www.broadcastify.com";
+pub const BROADCASTIFY_URL: &str = "http://www.broadcastify.com";
 
 #[derive(Debug)]
 pub struct Feed<'a> {
