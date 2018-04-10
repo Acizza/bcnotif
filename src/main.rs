@@ -89,6 +89,12 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
             print_info(&feed, stats);
         }
 
+        if let Some(max_times) = config.misc.max_times_to_show_feed {
+            if stats.spike_count > max_times {
+                continue;
+            }
+        }
+
         let show_for_alert = feed.alert.is_some() && config.misc.show_alert_feeds;
         let can_show = stats.has_spiked || show_for_alert;
 
