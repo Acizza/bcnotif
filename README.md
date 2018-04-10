@@ -70,9 +70,10 @@ Since explaining all of the configuration layouts would be complicated, here is 
 Misc:
   Update Time: 6        # The time in minutes to wait to perform an update
   Minimum Listeners: 15 # Feeds below this value will never be processed
-  State Feeds ID: 6     # The state to process extra feed from in an update. It is not set by default
+  State Feeds ID: 0     # The state to process extra feed from in an update. It is not set by default
   Maximum Feeds To Display: 10
   Show Alert Feeds: true # Sets whether or not any feed that has an alert should be displayed regardless if it's spiking or not
+  Max Times To Show Feed: 0 # This controls how many times a feed can be showed in a row before notifications are disabled for it. It is not set by default.
 
 # This controls the global spike values (which are used to determine if a feed is jumping in listeners)
 Spike Percentages:
