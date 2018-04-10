@@ -23,12 +23,12 @@ mod error;
 mod feed;
 mod notify;
 
-use config::Config;
 use chrono::{Timelike, Utc};
+use config::Config;
 use error::Error;
 use feed::{Feed, statistics::{AverageData, ListenerStats}};
-use std::time::Duration;
 use std::path::PathBuf;
+use std::time::Duration;
 
 fn main() {
     #[cfg(windows)]
@@ -89,7 +89,8 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
             print_info(&feed, stats);
         }
 
-        let can_show = stats.has_spiked || feed.alert.is_some();
+        let show_for_alert = feed.alert.is_some() && config.misc.show_alert_feeds;
+        let can_show = stats.has_spiked || show_for_alert;
 
         if can_show && (display_feeds.len() as u32) < config.misc.max_feeds {
             display_feeds.push((feed, stats.clone()));

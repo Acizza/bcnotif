@@ -52,8 +52,8 @@ create_config_enum!(WeekdaySpike,
 impl WeekdaySpike {
     /// Returns the spike values for the current day, if it exists in the specified array.
     pub fn get_for_today(weekday_spikes: &[WeekdaySpike]) -> Option<&Spike> {
-        use chrono::Weekday::*;
         use self::WeekdaySpike::*;
+        use chrono::Weekday::*;
 
         let weekday = Local::today().weekday();
 
@@ -85,6 +85,7 @@ create_config_struct!(Misc,
 	minimum_listeners: u32         => "Minimum Listeners"        => 15,
 	state_feeds_id:    Option<u32> => "State Feeds ID"           => None,
     max_feeds:         u32         => "Maximum Feeds To Display" => 10,
+    show_alert_feeds:  bool        => "Show Alert Feeds"         => true,
 );
 
 create_config_enum!(SortType,
@@ -103,9 +104,15 @@ create_config_struct!(Sorting,
 );
 
 macro_rules! gen_base_parse_stmt {
-    (optional, $category:expr, $doc:ident) => (ParseYaml::from(&$doc[$category]));
-    (default,  $category:expr, $doc:ident) => (ParseYaml::from_or_default(&$doc[$category]));
-    (all,      $category:expr, $doc:ident) => (ParseYaml::all(&$doc[$category]));
+    (optional, $category:expr, $doc:ident) => {
+        ParseYaml::from(&$doc[$category])
+    };
+    (default, $category:expr, $doc:ident) => {
+        ParseYaml::from_or_default(&$doc[$category])
+    };
+    (all, $category:expr, $doc:ident) => {
+        ParseYaml::all(&$doc[$category])
+    };
 }
 
 macro_rules! gen_base_config {
@@ -200,9 +207,17 @@ impl_parseyaml_for_numeric!(u8 u32 f32);
 
 impl ParseYaml for String {
     fn from(doc: &Yaml) -> Option<String> {
-        use yaml_rust::Yaml::*;
         match *doc {
-            String(ref s) => Some(s.clone()),
+            Yaml::String(ref s) => Some(s.clone()),
+            _ => None,
+        }
+    }
+}
+
+impl ParseYaml for bool {
+    fn from(doc: &Yaml) -> Option<bool> {
+        match *doc {
+            Yaml::Boolean(value) => Some(value),
             _ => None,
         }
     }
