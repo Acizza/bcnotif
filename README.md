@@ -1,6 +1,6 @@
 # bcnotif
 
-The purpose of this program is to find audio feeds on Broadcastify that suddenly jump in listeners (or have an alert) and display a desktop notification for them, as a sudden jump in listeners usually means that some kind of event or emergency is happening. Since some people tune into feeds as soon as they hear multiple sirens, you can usually get notified of big incidents faster than you would following the news.
+The purpose of this program is to find audio feeds on Broadcastify that suddenly jump in listeners (or have an alert) and display a desktop notification for them, as a sudden jump in listeners usually means that some kind of event or emergency is happening. Since some people tune into feeds as soon as they see / hear an incident occuring, you can usually get notified of large incidents (such as mass shootings) faster than you would following the news.
 
 # Usage
 This program runs in the background and uses a default configuration that should be suitable for most uses, so it can be launched directly without having to configure anything.
@@ -9,13 +9,17 @@ This program runs in the background and uses a default configuration that should
 You can configure the application in many ways by creating a `config.yaml` file in the application directory.
 Configuration options include adding a state to monitor, changing the update time, changing the order feeds are displayed in, and using different spike values (which determine if a feed has suddenly jumped in listeners) for different days of the week, or for a certain feed ID, state, county, or feed name.
 
-For example, to process a certain state's feeds during an update, you can add this to the config file:
+For example, to process a certain state's feeds during an update (in addition to the top 50), you can add this to the config file:
 ```yaml
 Misc:
   State Feeds ID: 6 # California
 ```
 
-Where `6` is the state's ID. Since there is no convenient way to find states by their name, you have to provide its ID instead. To get the ID, go [here](http://www.broadcastify.com/listen/), select the desired state, and use the number from the end of the URL.
+Since there is no convenient way to find states by their name, you will have to provide its ID instead. To get a state's ID:
+
+1. Go to this [URL](https://www.broadcastify.com/listen/)
+1. Select the state you want to process feeds from
+1. Copy the number from the end of the resulting URL
 
 Another common configuration would be increase the spike values for the weekend. An example of such configuration is as follows:
 ```yaml
@@ -68,6 +72,7 @@ Misc:
   Minimum Listeners: 15 # Feeds below this value will never be processed
   State Feeds ID: 6     # The state to process extra feed from in an update. It is not set by default
   Maximum Feeds To Display: 10
+  Show Alert Feeds: true # Sets whether or not any feed that has an alert should be displayed regardless if it's spiking or not
 
 # This controls the global spike values (which are used to determine if a feed is jumping in listeners)
 Spike Percentages:
