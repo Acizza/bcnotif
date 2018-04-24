@@ -13,6 +13,7 @@ print-feed-data = []
 failure     = "0.1"
 chrono      = "0.4"
 csv         = "1.0.0-beta.5"
+directories = "0.9"
 lazy_static = "1.0"
 select      = "0.4"
 reqwest     = "0.8"

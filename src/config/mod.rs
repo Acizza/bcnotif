@@ -2,9 +2,90 @@
 mod generation;
 
 use chrono::{Datelike, Local};
+use error::ConfigError;
 use feed::Feed;
+use path;
 use std::path::Path;
 use yaml_rust::{Yaml, YamlLoader};
+
+pub const DEFAULT_CONFIG_NAME: &str = "config.toml";
+
+macro_rules! gen_base_parse_stmt {
+    (optional, $category:expr, $doc:ident) => {
+        ParseYaml::from(&$doc[$category])
+    };
+    (default, $category:expr, $doc:ident) => {
+        ParseYaml::from_or_default(&$doc[$category])
+    };
+    (all, $category:expr, $doc:ident) => {
+        ParseYaml::all(&$doc[$category])
+    };
+}
+
+macro_rules! gen_base_config {
+    ($name:ident, $($field:ident: $type:ty => $parse_type:ident => $category:expr,)+) => {
+        #[derive(Debug, Default)]
+        pub struct $name {
+            $(pub $field: $type,)+
+        }
+
+        impl $name {
+            pub fn from_file(path: &Path) -> Result<$name, ::error::ConfigError> {
+                let file = ::util::read_file(path).map_err(::error::ConfigError::Io)?;
+
+                if file.len() == 0 {
+                    return Ok(Config::default())
+                }
+
+                let doc = YamlLoader::load_from_str(&file).map_err(::error::ConfigError::YAMLScan)?;
+                let doc = &doc[0]; // We only care about the first document
+
+                Ok($name {
+                    $($field: gen_base_parse_stmt!($parse_type, $category, doc),)+
+                })
+            }
+        }
+    };
+}
+
+gen_base_config!(Config,
+    global_spike:   Spike             => default => "Spike Percentage",
+    unskewed_avg:   UnskewedAverage   => default => "Unskewed Average",
+    weekday_spikes: Vec<WeekdaySpike> => all     => "Weekday Spike Percentages",
+    feed_settings:  Vec<FeedSetting>  => all     => "Feed Settings",
+    misc:           Misc              => default => "Misc",
+    sorting:        Sorting           => default => "Feed Sorting",
+    blacklist:      Vec<FeedIdent>    => all     => "Blacklist",
+    whitelist:      Vec<FeedIdent>    => all     => "Whitelist",
+);
+
+impl Config {
+    pub fn load() -> Result<Config, ConfigError> {
+        let path = path::get_config_file(DEFAULT_CONFIG_NAME)?;
+
+        if path.exists() {
+            Config::from_file(&path)
+        } else {
+            Ok(Config::default())
+        }
+    }
+
+    /// Gets the spike values for the specified feed based off of
+    /// other configuration values that may be set.
+    pub fn get_feed_spike(&self, feed: &Feed) -> &Spike {
+        // Find any settings for the specified feed
+        let feed_setting = self.feed_settings
+            .iter()
+            .find(|s| s.ident.matches_feed(feed));
+
+        match feed_setting {
+            Some(setting) => {
+                WeekdaySpike::get_for_today(&setting.weekday_spikes).unwrap_or(&setting.spike)
+            }
+            None => WeekdaySpike::get_for_today(&self.weekday_spikes).unwrap_or(&self.global_spike),
+        }
+    }
+}
 
 create_config_struct!(Spike,
     jump:                    f32 => "Jump Required"                        => 0.4,
@@ -103,73 +184,6 @@ create_config_struct!(Sorting,
     sort_type:  SortType  => "Sort By"    => { SortType::Listeners },
     sort_order: SortOrder => "Sort Order" => { SortOrder::Descending },
 );
-
-macro_rules! gen_base_parse_stmt {
-    (optional, $category:expr, $doc:ident) => {
-        ParseYaml::from(&$doc[$category])
-    };
-    (default, $category:expr, $doc:ident) => {
-        ParseYaml::from_or_default(&$doc[$category])
-    };
-    (all, $category:expr, $doc:ident) => {
-        ParseYaml::all(&$doc[$category])
-    };
-}
-
-macro_rules! gen_base_config {
-    ($name:ident, $($field:ident: $type:ty => $parse_type:ident => $category:expr,)+) => {
-        #[derive(Debug, Default)]
-        pub struct $name {
-            $(pub $field: $type,)+
-        }
-
-        impl $name {
-            pub fn from_file(path: &Path) -> Result<$name, ::error::ConfigError> {
-                let file = ::util::read_file(path).map_err(::error::ConfigError::Io)?;
-
-                if file.len() == 0 {
-                    return Ok(Config::default())
-                }
-
-                let doc = YamlLoader::load_from_str(&file).map_err(::error::ConfigError::YAMLScan)?;
-                let doc = &doc[0]; // We only care about the first document
-
-                Ok($name {
-                    $($field: gen_base_parse_stmt!($parse_type, $category, doc),)+
-                })
-            }
-        }
-    };
-}
-
-gen_base_config!(Config,
-    global_spike:   Spike             => default => "Spike Percentage",
-    unskewed_avg:   UnskewedAverage   => default => "Unskewed Average",
-    weekday_spikes: Vec<WeekdaySpike> => all     => "Weekday Spike Percentages",
-    feed_settings:  Vec<FeedSetting>  => all     => "Feed Settings",
-    misc:           Misc              => default => "Misc",
-    sorting:        Sorting           => default => "Feed Sorting",
-    blacklist:      Vec<FeedIdent>    => all     => "Blacklist",
-    whitelist:      Vec<FeedIdent>    => all     => "Whitelist",
-);
-
-impl Config {
-    /// Gets the spike values for the specified feed based off of
-    /// other configuration values that may be set.
-    pub fn get_feed_spike(&self, feed: &Feed) -> &Spike {
-        // Find any settings for the specified feed
-        let feed_setting = self.feed_settings
-            .iter()
-            .find(|s| s.ident.matches_feed(feed));
-
-        match feed_setting {
-            Some(setting) => {
-                WeekdaySpike::get_for_today(&setting.weekday_spikes).unwrap_or(&setting.spike)
-            }
-            None => WeekdaySpike::get_for_today(&self.weekday_spikes).unwrap_or(&self.global_spike),
-        }
-    }
-}
 
 trait ParseYaml: Sized + Default {
     fn from(doc: &Yaml) -> Option<Self>;

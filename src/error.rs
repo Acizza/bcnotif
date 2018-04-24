@@ -87,6 +87,12 @@ pub enum ConfigError {
     YAMLScan(#[cause] ::yaml_rust::ScanError),
 }
 
+impl From<::std::io::Error> for ConfigError {
+    fn from(err: ::std::io::Error) -> ConfigError {
+        ConfigError::Io(err)
+    }
+}
+
 fn build_err_msg(err: &failure::Error) -> String {
     let mut msg = format!("error: {}\n", err.cause());
 

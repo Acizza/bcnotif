@@ -8,6 +8,7 @@ extern crate lazy_static;
 
 extern crate chrono;
 extern crate csv;
+extern crate directories;
 extern crate reqwest;
 extern crate select;
 extern crate yaml_rust;
@@ -22,11 +23,13 @@ mod config;
 mod error;
 mod feed;
 mod notify;
+mod path;
 
 use chrono::{Timelike, Utc};
 use config::Config;
 use error::Error;
-use feed::{Feed, statistics::{AverageData, ListenerStats}};
+use feed::statistics::{AverageData, ListenerStats};
+use feed::Feed;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -48,7 +51,6 @@ fn main() {
 
 fn run() -> Result<(), Error> {
     let exe_dir = get_exe_directory().map_err(Error::Io)?;
-    let config_path = exe_dir.clone().join("config.yaml");
 
     let mut averages = AverageData::new(exe_dir.join("averages.csv"));
 
@@ -57,11 +59,7 @@ fn run() -> Result<(), Error> {
     }
 
     loop {
-        let config = if !config_path.exists() {
-            Config::default()
-        } else {
-            Config::from_file(&config_path).map_err(Error::Config)?
-        };
+        let config = Config::load().map_err(Error::Config)?;
 
         match perform_update(&mut averages, &config) {
             Ok(_) => (),
@@ -89,6 +87,7 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
             print_info(&feed, stats);
         }
 
+        // TODO: Move to statistics module (along with some other misc functionality)
         if let Some(max_times) = config.misc.max_times_to_show_feed {
             if stats.spike_count > max_times {
                 continue;
