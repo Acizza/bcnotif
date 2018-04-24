@@ -30,7 +30,6 @@ use config::Config;
 use error::Error;
 use feed::statistics::{AverageData, ListenerStats};
 use feed::Feed;
-use std::path::PathBuf;
 use std::time::Duration;
 
 fn main() {
@@ -50,13 +49,7 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
-    let exe_dir = get_exe_directory().map_err(Error::Io)?;
-
-    let mut averages = AverageData::new(exe_dir.join("averages.csv"));
-
-    if averages.path.exists() {
-        averages.load().map_err(Error::Statistics)?;
-    }
+    let mut averages = AverageData::load().map_err(Error::Statistics)?;
 
     loop {
         let config = Config::load().map_err(Error::Config)?;
@@ -156,10 +149,4 @@ fn print_info(feed: &Feed, stats: &ListenerStats) {
     println!("\tunskewed avg | {:?}", stats.unskewed_average);
     println!("\thas spiked   | {}", stats.has_spiked);
     println!("\ttimes spiked | {}", stats.spike_count);
-}
-
-fn get_exe_directory() -> std::io::Result<PathBuf> {
-    let mut path = std::env::current_exe()?;
-    path.pop();
-    Ok(path)
 }

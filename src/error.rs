@@ -3,9 +3,6 @@ use notify;
 
 #[derive(Fail, Debug)]
 pub enum Error {
-    #[fail(display = "io error")]
-    Io(#[cause] ::std::io::Error),
-
     #[fail(display = "config error")]
     Config(#[cause] ConfigError),
 
@@ -61,6 +58,12 @@ pub enum StatisticsError {
 
     #[fail(display = "CSV file contains record with too few rows")]
     TooFewRows,
+}
+
+impl From<::std::io::Error> for StatisticsError {
+    fn from(err: ::std::io::Error) -> StatisticsError {
+        StatisticsError::Io(err)
+    }
 }
 
 #[derive(Fail, Debug)]

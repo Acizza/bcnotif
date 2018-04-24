@@ -3,8 +3,11 @@ use chrono::{Timelike, Utc};
 use csv;
 use error::StatisticsError;
 use feed::Feed;
+use path;
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+pub const DEFAULT_AVERAGES_FILE: &str = "averages.csv";
 
 type FeedID = u32;
 
@@ -24,9 +27,11 @@ impl AverageData {
         }
     }
 
-    pub fn load(&mut self) -> Result<(), StatisticsError> {
+    pub fn from_file(path: PathBuf) -> Result<AverageData, StatisticsError> {
+        let mut avg_data = AverageData::new(path.clone());
+
         let hour = Utc::now().hour() as usize;
-        let mut rdr = csv::Reader::from_path(&self.path).map_err(StatisticsError::CSV)?;
+        let mut rdr = csv::Reader::from_path(path).map_err(StatisticsError::CSV)?;
 
         for result in rdr.records() {
             let record = result.map_err(StatisticsError::CSV)?;
@@ -54,10 +59,20 @@ impl AverageData {
                 ListenerStats::with_data(listeners, averages)
             };
 
-            self.data.insert(id, stats);
+            avg_data.data.insert(id, stats);
         }
 
-        Ok(())
+        Ok(avg_data)
+    }
+
+    pub fn load() -> Result<AverageData, StatisticsError> {
+        let path = path::get_cache_file(DEFAULT_AVERAGES_FILE)?;
+
+        if path.exists() {
+            AverageData::from_file(path)
+        } else {
+            Ok(AverageData::new(path))
+        }
     }
 
     pub fn save(&self) -> Result<(), StatisticsError> {
