@@ -1,10 +1,5 @@
 use error::NotifyError;
 
-pub enum Icon {
-    Update,
-    Error,
-}
-
 #[cfg(any(unix, macos))]
 mod unix {
     extern crate notify_rust;
@@ -12,20 +7,10 @@ mod unix {
     use self::notify_rust::Notification;
     use super::*;
 
-    impl Icon {
-        fn get_name(&self) -> &str {
-            match *self {
-                Icon::Update => "emblem-sound",
-                Icon::Error => "dialog-error",
-            }
-        }
-    }
-
-    pub fn create(icon: &Icon, title: &str, body: &str) -> Result<(), NotifyError> {
+    pub fn create(title: &str, body: &str) -> Result<(), NotifyError> {
         Notification::new()
             .summary(title)
             .body(body)
-            .icon(icon.get_name())
             .show()
             .map_err(|_| NotifyError::CreationFailed)?;
 
@@ -38,7 +23,7 @@ mod windows {
     use winrt::FastHString;
     use winrt::windows::data::xml::dom::*;
     use winrt::windows::ui::notifications::*;
-    use super::{Icon, NotifyError};
+    use super::NotifyError;
 
     impl From<::winrt::Error> for NotifyError {
         fn from(err: ::winrt::Error) -> NotifyError {
@@ -53,7 +38,7 @@ mod windows {
     const APP_ID: &str =
         "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe";
 
-    pub fn create(_: &Icon, title: &str, body: &str) -> Result<(), NotifyError> {
+    pub fn create(title: &str, body: &str) -> Result<(), NotifyError> {
         let toast_xml = ToastNotificationManager::get_template_content(
             ToastTemplateType::ToastText02,
         )?.ok_or_else(|| NotifyError::NullElement("template content".into()))?;
@@ -96,5 +81,5 @@ pub use self::unix::create;
 pub use self::windows::create;
 
 pub fn create_error(body: &str) -> Result<(), NotifyError> {
-    create(&Icon::Error, "Broadcastify Update Error", body)
+    create("Broadcastify Update Error", body)
 }

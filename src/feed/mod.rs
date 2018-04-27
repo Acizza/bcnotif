@@ -5,7 +5,7 @@ mod scrape;
 use config::Config;
 use error::FeedError;
 use feed::statistics::ListenerStats;
-use notify::{self, Icon};
+use notify;
 use reqwest;
 use std::borrow::Cow;
 
@@ -48,7 +48,7 @@ impl<'a> Feed<'a> {
             feed_id = self.id
         );
 
-        notify::create(&Icon::Update, &title, &body).map_err(FeedError::NotifyError)
+        notify::create(&title, &body).map_err(FeedError::NotifyError)
     }
 }
 
