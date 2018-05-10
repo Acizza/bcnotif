@@ -1,5 +1,5 @@
-use config::Config;
 use chrono::{Timelike, Utc};
+use config::Config;
 use csv;
 use error::StatisticsError;
 use feed::Feed;
@@ -66,7 +66,7 @@ impl AverageData {
     }
 
     pub fn load() -> Result<AverageData, StatisticsError> {
-        let path = path::get_cache_file(DEFAULT_AVERAGES_FILE)?;
+        let path = path::get_data_file(DEFAULT_AVERAGES_FILE)?;
 
         if path.exists() {
             AverageData::from_file(path)
