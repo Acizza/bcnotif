@@ -16,9 +16,6 @@ extern crate yaml_rust;
 #[cfg(windows)]
 extern crate winrt;
 
-#[macro_use]
-mod util;
-
 mod config;
 mod error;
 mod feed;
@@ -28,8 +25,8 @@ mod path;
 use chrono::{Timelike, Utc};
 use config::Config;
 use error::Error;
-use feed::statistics::{AverageData, ListenerStats};
 use feed::Feed;
+use feed::statistics::{AverageData, ListenerStats};
 use std::time::Duration;
 
 fn main() {

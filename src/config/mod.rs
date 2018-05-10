@@ -31,7 +31,7 @@ macro_rules! gen_base_config {
 
         impl $name {
             pub fn from_file(path: &Path) -> Result<$name, ::error::ConfigError> {
-                let file = ::util::read_file(path).map_err(::error::ConfigError::Io)?;
+                let file = ::std::fs::read_to_string(path).map_err(::error::ConfigError::Io)?;
 
                 if file.len() == 0 {
                     return Ok(Config::default())
