@@ -79,11 +79,10 @@ impl Config {
             .iter()
             .find(|s| s.ident.matches_feed(feed));
 
-        match feed_setting {
-            Some(setting) => {
-                WeekdaySpike::get_for_today(&setting.weekday_spikes).unwrap_or(&setting.spike)
-            }
-            None => WeekdaySpike::get_for_today(&self.weekday_spikes).unwrap_or(&self.global_spike),
+        if let Some(setting) = feed_setting {
+            WeekdaySpike::get_for_today(&setting.weekday_spikes).unwrap_or(&setting.spike)
+        } else {
+            WeekdaySpike::get_for_today(&self.weekday_spikes).unwrap_or(&self.global_spike)
         }
     }
 }
@@ -112,11 +111,11 @@ create_config_enum!(FeedIdent,
 impl FeedIdent {
     /// Returns true if the FeedIdent matches the corresponding feed data.
     pub fn matches_feed(&self, feed: &Feed) -> bool {
-        match *self {
-            FeedIdent::Name(ref name) => *name == feed.name,
-            FeedIdent::ID(id) => id == feed.id,
-            FeedIdent::County(ref c) => *c == feed.county,
-            FeedIdent::State(id) => id == feed.state.id,
+        match self {
+            FeedIdent::Name(name) => *name == feed.name,
+            FeedIdent::ID(id) => *id == feed.id,
+            FeedIdent::County(c) => *c == feed.county,
+            FeedIdent::State(id) => *id == feed.state.id,
         }
     }
 }
@@ -141,13 +140,13 @@ impl WeekdaySpike {
 
         for ws in weekday_spikes {
             match (weekday, ws) {
-                (Mon, &Monday(ref s))
-                | (Tue, &Tuesday(ref s))
-                | (Wed, &Wednesday(ref s))
-                | (Thu, &Thursday(ref s))
-                | (Fri, &Friday(ref s))
-                | (Sat, &Saturday(ref s))
-                | (Sun, &Sunday(ref s)) => return Some(s),
+                (Mon, Monday(s))
+                | (Tue, Tuesday(s))
+                | (Wed, Wednesday(s))
+                | (Thu, Thursday(s))
+                | (Fri, Friday(s))
+                | (Sat, Saturday(s))
+                | (Sun, Sunday(s)) => return Some(s),
                 _ => (),
             }
         }
@@ -208,10 +207,10 @@ macro_rules! impl_parseyaml_for_numeric {
         impl ParseYaml for $t {
             fn from(doc: &Yaml) -> Option<$t> {
                 use yaml_rust::Yaml::*;
-                match *doc {
-                    Integer(num)     => Some(num as $t),
-                    Real(ref string) => string.parse().ok(),
-                    _                => None,
+                match doc {
+                    Integer(num) => Some(*num as $t),
+                    Real(string) => string.parse().ok(),
+                    _ => None,
                 }
             }
         }
@@ -223,18 +222,20 @@ impl_parseyaml_for_numeric!(u8 u32 f32);
 
 impl ParseYaml for String {
     fn from(doc: &Yaml) -> Option<String> {
-        match *doc {
-            Yaml::String(ref s) => Some(s.clone()),
-            _ => None,
+        if let Yaml::String(s) = doc {
+            Some(s.clone())
+        } else {
+            None
         }
     }
 }
 
 impl ParseYaml for bool {
     fn from(doc: &Yaml) -> Option<bool> {
-        match *doc {
-            Yaml::Boolean(value) => Some(value),
-            _ => None,
+        if let Yaml::Boolean(value) = doc {
+            Some(*value)
+        } else {
+            None
         }
     }
 }
