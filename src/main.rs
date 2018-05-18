@@ -1,6 +1,9 @@
 #![windows_subsystem = "windows"]
 
 #[macro_use]
+extern crate clap;
+
+#[macro_use]
 extern crate failure;
 
 #[macro_use]
@@ -46,12 +49,23 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
+    let args = clap_app!(bcnotif =>
+        (version: env!("CARGO_PKG_VERSION"))
+        (author: env!("CARGO_PKG_AUTHORS"))
+        (@arg DONT_SAVE_DATA: --nosave "Avoid saving feed data")
+        (@arg ALWAYS_LOAD_CONFIG: --alwaysloadconfig "Load the configuration file on every update")
+        (@arg PRINT_FEED_DATA: --printdata "Print detailed feed data / statistics on every update")
+    ).get_matches();
+
     let mut averages = AverageData::load()?;
+    let mut config = Config::load()?;
 
     loop {
-        let config = Config::load()?;
+        if args.is_present("ALWAYS_LOAD_CONFIG") {
+            config = Config::load()?;
+        }
 
-        match perform_update(&mut averages, &config) {
+        match perform_update(&mut averages, &args, &config) {
             Ok(_) => (),
             Err(err) => error::display(&err.into()),
         }
@@ -60,7 +74,7 @@ fn run() -> Result<(), Error> {
     }
 }
 
-fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Error> {
+fn perform_update(averages: &mut AverageData, args: &clap::ArgMatches, config: &Config) -> Result<(), Error> {
     let hour = Utc::now().hour() as usize;
     let mut display_feeds = Vec::new();
 
@@ -72,11 +86,10 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
         let stats = averages.get_feed_stats(&feed);
         stats.update(hour, &feed, config);
 
-        if cfg!(feature = "print-feed-data") {
+        if args.is_present("PRINT_FEED_DATA") {
             print_info(&feed, stats);
         }
 
-        // TODO: Move to statistics module (along with some other misc functionality)
         if let Some(max_times) = config.misc.max_times_to_show_feed {
             if stats.spike_count > max_times {
                 continue;
@@ -94,7 +107,10 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
     sort_feeds(&mut display_feeds, config);
     show_feeds(&display_feeds)?;
 
-    averages.save()?;
+    if !args.is_present("DONT_SAVE_DATA") {
+        averages.save()?;
+    }
+
     Ok(())
 }
 
