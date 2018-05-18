@@ -101,7 +101,7 @@ impl<'a> FeedSource<'a> {
     }
 
     fn scrape(self, client: &reqwest::Client) -> Result<Vec<Feed<'a>>, FeedError> {
-        let body = self.download_page(client).map_err(FeedError::Reqwest)?;
+        let body = self.download_page(client)?;
 
         match self {
             FeedSource::Top => scrape::scrape_top(&body).map_err(FeedError::ParseTopFeeds),

@@ -31,10 +31,10 @@ impl AverageData {
         let mut avg_data = AverageData::new(path.clone());
 
         let hour = Utc::now().hour() as usize;
-        let mut rdr = csv::Reader::from_path(path).map_err(StatisticsError::CSV)?;
+        let mut rdr = csv::Reader::from_path(path)?;
 
         for result in rdr.records() {
-            let record = result.map_err(StatisticsError::CSV)?;
+            let record = result?;
 
             if record.len() < 1 + ListenerStats::HOURLY_SIZE {
                 return Err(StatisticsError::TooFewRows);
@@ -76,7 +76,7 @@ impl AverageData {
     }
 
     pub fn save(&self) -> Result<(), StatisticsError> {
-        let mut wtr = csv::Writer::from_path(&self.path).map_err(StatisticsError::CSV)?;
+        let mut wtr = csv::Writer::from_path(&self.path)?;
         let mut fields = Vec::with_capacity(1 + ListenerStats::HOURLY_SIZE);
 
         for (id, stats) in &self.data {
@@ -86,11 +86,11 @@ impl AverageData {
                 fields.push(average.round().to_string());
             }
 
-            wtr.write_record(&fields).map_err(StatisticsError::CSV)?;
+            wtr.write_record(&fields)?;
             fields.clear();
         }
 
-        wtr.flush().map_err(StatisticsError::Io)?;
+        wtr.flush()?;
         Ok(())
     }
 

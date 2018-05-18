@@ -31,13 +31,13 @@ macro_rules! gen_base_config {
 
         impl $name {
             pub fn from_file(path: &Path) -> Result<$name, ::error::ConfigError> {
-                let file = ::std::fs::read_to_string(path).map_err(::error::ConfigError::Io)?;
+                let file = ::std::fs::read_to_string(path)?;
 
                 if file.len() == 0 {
                     return Ok(Config::default())
                 }
 
-                let doc = YamlLoader::load_from_str(&file).map_err(::error::ConfigError::YAMLScan)?;
+                let doc = YamlLoader::load_from_str(&file)?;
                 let doc = &doc[0]; // We only care about the first document
 
                 Ok($name {
@@ -74,7 +74,8 @@ impl Config {
     /// other configuration values that may be set.
     pub fn get_feed_spike(&self, feed: &Feed) -> &Spike {
         // Find any settings for the specified feed
-        let feed_setting = self.feed_settings
+        let feed_setting = self
+            .feed_settings
             .iter()
             .find(|s| s.ident.matches_feed(feed));
 

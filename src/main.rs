@@ -25,8 +25,8 @@ mod path;
 use chrono::{Timelike, Utc};
 use config::Config;
 use error::Error;
-use feed::Feed;
 use feed::statistics::{AverageData, ListenerStats};
+use feed::Feed;
 use std::time::Duration;
 
 fn main() {
@@ -46,10 +46,10 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
-    let mut averages = AverageData::load().map_err(Error::Statistics)?;
+    let mut averages = AverageData::load()?;
 
     loop {
-        let config = Config::load().map_err(Error::Config)?;
+        let config = Config::load()?;
 
         match perform_update(&mut averages, &config) {
             Ok(_) => (),
@@ -64,8 +64,7 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
     let hour = Utc::now().hour() as usize;
     let mut display_feeds = Vec::new();
 
-    let feeds = feed::scrape_all(config)
-        .map_err(Error::Feed)?
+    let feeds = feed::scrape_all(config)?
         .into_iter()
         .filter(|feed| feed.listeners >= config.misc.minimum_listeners);
 
@@ -95,7 +94,7 @@ fn perform_update(averages: &mut AverageData, config: &Config) -> Result<(), Err
     sort_feeds(&mut display_feeds, config);
     show_feeds(&display_feeds)?;
 
-    averages.save().map_err(Error::Statistics)?;
+    averages.save()?;
     Ok(())
 }
 
@@ -127,8 +126,7 @@ fn show_feeds(feeds: &[(Feed, ListenerStats)]) -> Result<(), Error> {
     let total_feeds = feeds.len() as u32;
 
     for (i, &(ref feed, ref stats)) in feeds.iter().enumerate() {
-        feed.show_notification(stats, 1 + i as u32, total_feeds)
-            .map_err(Error::Feed)?;
+        feed.show_notification(stats, 1 + i as u32, total_feeds)?;
     }
 
     Ok(())

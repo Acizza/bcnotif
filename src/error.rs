@@ -1,6 +1,18 @@
 use failure;
 use notify;
 
+macro_rules! impl_error_conversion {
+    ($err_name:ident, $($from_ty:ty => $to_ty:ident,)+) => {
+        $(
+        impl From<$from_ty> for $err_name {
+            fn from(f: $from_ty) -> $err_name {
+                $err_name::$to_ty(f)
+            }
+        }
+        )+
+    };
+}
+
 #[derive(Fail, Debug)]
 pub enum Error {
     #[fail(display = "config error")]
@@ -12,6 +24,12 @@ pub enum Error {
     #[fail(display = "statistics error")]
     Statistics(#[cause] StatisticsError),
 }
+
+impl_error_conversion!(Error,
+    ConfigError => Config,
+    FeedError => Feed,
+    StatisticsError => Statistics,
+);
 
 #[derive(Fail, Debug)]
 pub enum FeedError {
@@ -27,6 +45,10 @@ pub enum FeedError {
     #[fail(display = "failed to parse state ({}) feeds", _1)]
     ParseStateFeeds(#[cause] ScrapeError, String),
 }
+
+impl_error_conversion!(FeedError,
+    ::reqwest::Error => Reqwest,
+);
 
 type ElementName = &'static str;
 
@@ -60,11 +82,10 @@ pub enum StatisticsError {
     TooFewRows,
 }
 
-impl From<::std::io::Error> for StatisticsError {
-    fn from(err: ::std::io::Error) -> StatisticsError {
-        StatisticsError::Io(err)
-    }
-}
+impl_error_conversion!(StatisticsError,
+    ::csv::Error => CSV,
+    ::std::io::Error => Io,
+);
 
 #[derive(Fail, Debug)]
 pub enum NotifyError {
@@ -90,11 +111,10 @@ pub enum ConfigError {
     YAMLScan(#[cause] ::yaml_rust::ScanError),
 }
 
-impl From<::std::io::Error> for ConfigError {
-    fn from(err: ::std::io::Error) -> ConfigError {
-        ConfigError::Io(err)
-    }
-}
+impl_error_conversion!(ConfigError,
+    ::std::io::Error => Io,
+    ::yaml_rust::ScanError => YAMLScan,
+);
 
 fn build_err_msg(err: &failure::Error) -> String {
     let mut msg = format!("error: {}\n", err.cause());
