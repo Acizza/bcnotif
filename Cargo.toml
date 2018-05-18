@@ -6,9 +6,6 @@ authors = ["Acizza <jonathanmce@gmail.com>"]
 [profile.release]
 lto = true
 
-[features]
-print-feed-data = []
-
 [dependencies]
 failure     = "0.1"
 chrono      = "0.4"
