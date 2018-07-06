@@ -3,7 +3,14 @@ use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 lazy_static! {
-    static ref PROJECT_DIRS: ProjectDirs = ProjectDirs::from("", "", env!("CARGO_PKG_NAME"));
+    static ref PROJECT_DIRS: ProjectDirs = {
+        let dirs = ProjectDirs::from("", "", env!("CARGO_PKG_NAME"));
+
+        match dirs {
+            Some(dirs) => dirs,
+            None => panic!("failed to get user directories"),
+        }
+    };
 }
 
 fn get_path(dir: &Path, filename: &str) -> io::Result<PathBuf> {
