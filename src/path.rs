@@ -15,7 +15,7 @@ lazy_static! {
 
 fn get_path(dir: &Path, filename: &str) -> io::Result<PathBuf> {
     if !dir.exists() {
-        fs::create_dir(dir)?;
+        fs::create_dir_all(dir)?;
     }
 
     let mut path = PathBuf::from(dir);
