@@ -117,9 +117,9 @@ impl_error_conversion!(ConfigError,
 );
 
 fn build_err_msg(err: &failure::Error) -> String {
-    let mut msg = format!("error: {}\n", err.cause());
+    let mut msg = format!("error: {}\n", err);
 
-    for cause in err.causes().skip(1) {
+    for cause in err.iter_chain().skip(1) {
         msg.push_str(&format!("caused by: {}\n", cause));
     }
 
