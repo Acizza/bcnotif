@@ -160,4 +160,4 @@ Unskewed Average:
   Jump Required To Set: 4.0
 ```
 
-It is also worth noting that the coniguration file is reloaded on every update, so you do not need to restart the application after making changes to it.
+By default, the configuration file is only read once when the program is launched. To have it be read on every update, you can launch the program with the `--alwaysloadconfig` flag.
