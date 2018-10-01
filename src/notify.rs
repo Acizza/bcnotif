@@ -20,10 +20,10 @@ mod unix {
 
 #[cfg(windows)]
 mod windows {
-    use winrt::FastHString;
+    use super::NotifyError;
     use winrt::windows::data::xml::dom::*;
     use winrt::windows::ui::notifications::*;
-    use super::NotifyError;
+    use winrt::FastHString;
 
     impl From<::winrt::Error> for NotifyError {
         fn from(err: ::winrt::Error) -> NotifyError {
@@ -39,9 +39,9 @@ mod windows {
         "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe";
 
     pub fn create(title: &str, body: &str) -> Result<(), NotifyError> {
-        let toast_xml = ToastNotificationManager::get_template_content(
-            ToastTemplateType::ToastText02,
-        )?.ok_or_else(|| NotifyError::NullElement("template content".into()))?;
+        let toast_xml =
+            ToastNotificationManager::get_template_content(ToastTemplateType::ToastText02)?
+                .ok_or_else(|| NotifyError::NullElement("template content".into()))?;
 
         let toast_text_elements = toast_xml
             .get_elements_by_tag_name(&FastHString::new("text"))?

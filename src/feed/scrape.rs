@@ -15,7 +15,8 @@ pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, ScrapeError> {
 
         // The top 50 feed list allows multiple states and/or counties to appear,
         // so we can't assume their location
-        let location_info = row.find(Name("td"))
+        let location_info = row
+            .find(Name("td"))
             .nth(1)
             .ok_or_else(|| ScrapeError::NoElement("location"))?;
 
@@ -43,7 +44,8 @@ pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, ScrapeError> {
             county,
             name,
             listeners: parse_listeners(&row)?,
-            alert: row.find(Class("messageBox"))
+            alert: row
+                .find(Class("messageBox"))
                 .next()
                 .map(|alert| alert.text()),
         });
@@ -82,12 +84,14 @@ pub fn scrape_state<'a>(state: &State<'a>, body: &str) -> Result<Vec<Feed<'a>>, 
     for feed in feed_data.skip(1) {
         let (id, name) = parse_id_and_name(&feed, "w1p")?;
 
-        let county = feed.find(Name("a"))
+        let county = feed
+            .find(Name("a"))
             .next()
             .map(|node| node.text())
             .unwrap_or_else(|| "Numerous".to_string());
 
-        let alert = feed.find(Name("font").and(Class("fontRed")))
+        let alert = feed
+            .find(Name("font").and(Class("fontRed")))
             .next()
             .map(|alert| alert.text());
 
@@ -109,11 +113,13 @@ pub fn scrape_state<'a>(state: &State<'a>, body: &str) -> Result<Vec<Feed<'a>>, 
 }
 
 fn parse_id_and_name(node: &Node, class_name: &str) -> Result<(u32, String), ScrapeError> {
-    let base = node.find(Class(class_name).descendant(Name("a")))
+    let base = node
+        .find(Class(class_name).descendant(Name("a")))
         .next()
         .ok_or_else(|| ScrapeError::NoElement("id and name"))?;
 
-    let id = base.attr("href")
+    let id = base
+        .attr("href")
         .and_then(parse_link_id)
         .ok_or_else(|| ScrapeError::NoElement("feed id"))?
         .parse::<u32>()
@@ -123,12 +129,14 @@ fn parse_id_and_name(node: &Node, class_name: &str) -> Result<(u32, String), Scr
 }
 
 fn parse_listeners(node: &Node) -> Result<u32, ScrapeError> {
-    let text = node.find(Class("c").and(Class("m")))
+    let text = node
+        .find(Class("c").and(Class("m")))
         .next()
         .map(|node| node.text())
         .ok_or_else(|| ScrapeError::NoElement("feed listeners"))?;
 
-    let result = text.trim_right()
+    let result = text
+        .trim_right()
         .parse::<u32>()
         .map_err(|e| ScrapeError::FailedIntParse(e, "feed listeners"))?;
 

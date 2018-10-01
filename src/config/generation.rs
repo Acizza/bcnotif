@@ -24,7 +24,11 @@ macro_rules! gen_struct_value {
     // Value with minimum
     ($parent:expr, $disp_name:expr, [$min:expr, $default:expr]) => {{
         let result = gen_struct_value!($parent, $disp_name, $default);
-        if result < $min { $min } else { result }
+        if result < $min {
+            $min
+        } else {
+            result
+        }
     }};
 
     // Value with no display name that exits early on failure
@@ -54,11 +58,21 @@ macro_rules! gen_struct_value {
 }
 
 macro_rules! get_default {
-    (default)                    => (Default::default());
-    (fail)                       => (Default::default());
-    (all)                        => (Vec::new());
-    ([$min:expr, $default:expr]) => ($default);
-    ($default:expr)              => ($default);
+    (default) => {
+        Default::default()
+    };
+    (fail) => {
+        Default::default()
+    };
+    (all) => {
+        Vec::new()
+    };
+    ([$min:expr, $default:expr]) => {
+        $default
+    };
+    ($default:expr) => {
+        $default
+    };
 }
 
 /// Generates a new group of configuration values.
@@ -90,8 +104,12 @@ macro_rules! create_config_struct {
 
 /// Generates the name used to read an enum field.
 macro_rules! get_enum_field_name {
-    ($field:ident, self)            => (stringify!($field));
-    ($field:ident, $disp_name:expr) => ($disp_name);
+    ($field:ident, self) => {
+        stringify!($field)
+    };
+    ($field:ident, $disp_name:expr) => {
+        $disp_name
+    };
 }
 
 /// Generates a new group of configuration values where only one variant can be picked.
