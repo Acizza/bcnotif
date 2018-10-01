@@ -15,7 +15,7 @@ csv         = "1"
 directories = "1"
 lazy_static = "1"
 select      = "0.4"
-reqwest     = "0.8"
+reqwest     = "0.9"
 yaml-rust   = "0.4"
 
 [target.'cfg(any(unix, macos))'.dependencies]
