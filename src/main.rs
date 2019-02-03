@@ -7,27 +7,17 @@ extern crate failure;
 #[macro_use]
 extern crate lazy_static;
 
-extern crate chrono;
-extern crate csv;
-extern crate directories;
-extern crate reqwest;
-extern crate select;
-extern crate yaml_rust;
-
-#[cfg(windows)]
-extern crate winrt;
-
 mod config;
 mod error;
 mod feed;
 mod notify;
 mod path;
 
+use crate::feed::statistics::{AverageData, ListenerStats};
+use crate::feed::Feed;
 use chrono::{Timelike, Utc};
 use config::Config;
 use error::Error;
-use feed::statistics::{AverageData, ListenerStats};
-use feed::Feed;
 use std::time::Duration;
 
 fn main() {

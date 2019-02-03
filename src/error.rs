@@ -1,5 +1,5 @@
+use crate::notify;
 use failure;
-use notify;
 
 macro_rules! impl_error_conversion {
     ($err_name:ident, $($from_ty:ty => $to_ty:ident,)+) => {

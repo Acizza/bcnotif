@@ -1,5 +1,5 @@
-use error::ScrapeError;
-use feed::{Feed, State};
+use crate::error::ScrapeError;
+use crate::feed::{Feed, State};
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Class, Name, Predicate};

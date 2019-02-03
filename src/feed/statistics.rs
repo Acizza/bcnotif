@@ -1,9 +1,9 @@
+use crate::config::Config;
+use crate::error::StatisticsError;
+use crate::feed::Feed;
+use crate::path;
 use chrono::{Timelike, Utc};
-use config::Config;
 use csv;
-use error::StatisticsError;
-use feed::Feed;
-use path;
 use std::collections::HashMap;
 use std::path::PathBuf;
 

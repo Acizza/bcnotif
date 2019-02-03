@@ -1,4 +1,4 @@
-use error::NotifyError;
+use crate::error::NotifyError;
 
 #[cfg(any(unix, macos))]
 mod unix {

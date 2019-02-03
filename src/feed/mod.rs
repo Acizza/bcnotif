@@ -2,10 +2,10 @@ pub mod statistics;
 
 mod scrape;
 
-use config::Config;
-use error::FeedError;
-use feed::statistics::ListenerStats;
-use notify;
+use crate::config::Config;
+use crate::error::FeedError;
+use crate::feed::statistics::ListenerStats;
+use crate::notify;
 use reqwest;
 use std::borrow::Cow;
 

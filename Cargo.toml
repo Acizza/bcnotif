@@ -2,6 +2,7 @@
 name = "bcnotif"
 version = "0.9.0"
 authors = ["Acizza <jgit@tuta.io>"]
+edition = "2018"
 
 [profile.release]
 lto = true
