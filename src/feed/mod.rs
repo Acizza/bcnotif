@@ -5,7 +5,7 @@ mod scrape;
 use crate::config::Config;
 use crate::error::FeedError;
 use crate::feed::statistics::ListenerStats;
-use crate::notify;
+use notify_rust::Notification;
 use reqwest;
 use std::borrow::Cow;
 
@@ -48,7 +48,13 @@ impl<'a> Feed<'a> {
             feed_id = self.id
         );
 
-        notify::create(&title, &body).map_err(FeedError::NotifyError)
+        Notification::new()
+            .summary(&title)
+            .body(&body)
+            .show()
+            .map_err(|_| FeedError::FailedToCreateNotification)?;
+
+        Ok(())
     }
 }
 

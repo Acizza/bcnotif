@@ -1,5 +1,3 @@
-#![windows_subsystem = "windows"]
-
 #[macro_use]
 extern crate clap;
 #[macro_use]
@@ -10,7 +8,6 @@ extern crate lazy_static;
 mod config;
 mod error;
 mod feed;
-mod notify;
 mod path;
 
 use crate::feed::statistics::{AverageData, ListenerStats};
@@ -21,9 +18,6 @@ use error::Error;
 use std::time::Duration;
 
 fn main() {
-    #[cfg(windows)]
-    let rt = winrt::RuntimeContext::init();
-
     match run() {
         Ok(_) => (),
         Err(err) => {
@@ -31,9 +25,6 @@ fn main() {
             error::display(&err.into());
         }
     }
-
-    #[cfg(windows)]
-    rt.uninit();
 }
 
 fn run() -> Result<(), Error> {

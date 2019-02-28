@@ -1,4 +1,3 @@
-use crate::notify;
 use failure;
 
 macro_rules! impl_error_conversion {
@@ -33,9 +32,6 @@ impl_error_conversion!(Error,
 
 #[derive(Fail, Debug)]
 pub enum FeedError {
-    #[fail(display = "notification error")]
-    NotifyError(#[cause] NotifyError),
-
     #[fail(display = "HTTP error")]
     Reqwest(#[cause] ::reqwest::Error),
 
@@ -44,6 +40,9 @@ pub enum FeedError {
 
     #[fail(display = "failed to parse state ({}) feeds", _1)]
     ParseStateFeeds(#[cause] ScrapeError, String),
+
+    #[fail(display = "failed to create notification")]
+    FailedToCreateNotification,
 }
 
 impl_error_conversion!(FeedError,
@@ -88,21 +87,6 @@ impl_error_conversion!(StatisticsError,
 );
 
 #[derive(Fail, Debug)]
-pub enum NotifyError {
-    #[cfg(not(windows))]
-    #[fail(display = "failed to create notification")]
-    CreationFailed,
-
-    #[cfg(windows)]
-    #[fail(display = "WinRT error")]
-    WinRT(::winrt::Error),
-
-    #[cfg(windows)]
-    #[fail(display = "notification element is null: {}", _0)]
-    NullElement(String),
-}
-
-#[derive(Fail, Debug)]
 pub enum ConfigError {
     #[fail(display = "io error")]
     Io(#[cause] ::std::io::Error),
@@ -133,17 +117,20 @@ fn print_with_backtrace(msg: &str, err: &failure::Error) {
 
 /// Displays the provided error with a notification and by writing it to the terminal
 pub fn display(err: &failure::Error) {
+    use notify_rust::Notification;
+
     let msg = build_err_msg(err);
     print_with_backtrace(&msg, err);
 
-    match notify::create_error(&msg) {
-        Ok(_) => (),
-        Err(notif_err) => {
-            eprintln!("failed to create error notification:");
+    let notif = Notification::new()
+        .summary("Broadcastify Update Error")
+        .body(&msg)
+        .show();
 
-            let notif_err = notif_err.into();
-            let notif_msg = build_err_msg(&notif_err);
-            print_with_backtrace(&notif_msg, &notif_err);
+    match notif {
+        Ok(_) => (),
+        Err(_) => {
+            eprintln!("failed to create error notification");
         }
     }
 }
