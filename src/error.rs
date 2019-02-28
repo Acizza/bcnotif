@@ -1,4 +1,4 @@
-use failure;
+use failure::Fail;
 
 macro_rules! impl_error_conversion {
     ($err_name:ident, $($from_ty:ty => $to_ty:ident,)+) => {
@@ -99,38 +99,3 @@ impl_error_conversion!(ConfigError,
     ::std::io::Error => Io,
     ::yaml_rust::ScanError => YAMLScan,
 );
-
-fn build_err_msg(err: &failure::Error) -> String {
-    let mut msg = format!("error: {}\n", err);
-
-    for cause in err.iter_chain().skip(1) {
-        msg.push_str(&format!("caused by: {}\n", cause));
-    }
-
-    msg
-}
-
-fn print_with_backtrace(msg: &str, err: &failure::Error) {
-    eprintln!("{}", msg);
-    eprintln!("{}", err.backtrace());
-}
-
-/// Displays the provided error with a notification and by writing it to the terminal
-pub fn display(err: &failure::Error) {
-    use notify_rust::Notification;
-
-    let msg = build_err_msg(err);
-    print_with_backtrace(&msg, err);
-
-    let notif = Notification::new()
-        .summary("Broadcastify Update Error")
-        .body(&msg)
-        .show();
-
-    match notif {
-        Ok(_) => (),
-        Err(_) => {
-            eprintln!("failed to create error notification");
-        }
-    }
-}

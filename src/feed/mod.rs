@@ -5,6 +5,7 @@ mod scrape;
 use crate::config::Config;
 use crate::error::FeedError;
 use crate::feed::statistics::ListenerStats;
+use lazy_static::lazy_static;
 use notify_rust::Notification;
 use reqwest;
 use std::borrow::Cow;

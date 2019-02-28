@@ -1,10 +1,3 @@
-#[macro_use]
-extern crate clap;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate lazy_static;
-
 mod config;
 mod error;
 mod feed;
@@ -13,45 +6,72 @@ mod path;
 use crate::feed::statistics::{AverageData, ListenerStats};
 use crate::feed::Feed;
 use chrono::{Timelike, Utc};
+use clap::clap_app;
 use config::Config;
 use error::Error;
+use notify_rust::Notification;
 use std::time::Duration;
 
 fn main() {
-    match run() {
-        Ok(_) => (),
-        Err(err) => {
-            eprintln!("error during init:");
-            error::display(&err.into());
-        }
-    }
-}
-
-fn run() -> Result<(), Error> {
     let args = clap_app!(bcnotif =>
         (version: env!("CARGO_PKG_VERSION"))
         (author: env!("CARGO_PKG_AUTHORS"))
-        (@arg DONT_SAVE_DATA: --nosave "Avoid saving feed data")
-        (@arg ALWAYS_LOAD_CONFIG: --alwaysloadconfig "Load the configuration file on every update")
+        (@arg DONT_SAVE_DATA: --nosave "Don't save feed data")
+        (@arg RELOAD_CONFIG: -r --reloadconfig "Reload the configuration file on every update")
         (@arg PRINT_FEED_DATA: --printdata "Print detailed feed data / statistics on every update")
     )
     .get_matches();
 
+    match run(args) {
+        Ok(_) => (),
+        Err(err) => {
+            display_error(err);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn run(args: clap::ArgMatches) -> Result<(), Error> {
     let mut averages = AverageData::load()?;
     let mut config = Config::load()?;
 
     loop {
-        if args.is_present("ALWAYS_LOAD_CONFIG") {
+        if args.is_present("RELOAD_CONFIG") {
             config = Config::load()?;
         }
 
         match perform_update(&mut averages, &args, &config) {
             Ok(_) => (),
-            Err(err) => error::display(&err.into()),
+            Err(err) => display_error(err),
         }
 
         std::thread::sleep(Duration::from_secs((config.misc.update_time * 60.0) as u64));
     }
+}
+
+fn display_error<E>(err: E)
+where
+    E: Into<failure::Error>,
+{
+    let err = err.into();
+
+    eprintln!("error: {}", err);
+
+    for cause in err.iter_chain().skip(1) {
+        eprintln!("  cause: {}", cause);
+    }
+
+    let backtrace = err.backtrace().to_string();
+
+    if !backtrace.is_empty() {
+        eprintln!("{}", backtrace);
+    }
+
+    Notification::new()
+        .summary(&format!("Error in {}", env!("CARGO_PKG_NAME")))
+        .body(&err.to_string())
+        .show()
+        .ok();
 }
 
 fn perform_update(
@@ -107,8 +127,8 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
             SortOrder::Descending => (y, x),
         };
 
-        let &(ref x_feed, ref x_stats) = x;
-        let &(ref y_feed, ref y_stats) = y;
+        let (x_feed, x_stats) = x;
+        let (y_feed, y_stats) = y;
 
         match config.sorting.sort_type {
             SortType::Listeners => x_feed.listeners.cmp(&y_feed.listeners),
@@ -125,7 +145,7 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
 fn show_feeds(feeds: &[(Feed, ListenerStats)]) -> Result<(), Error> {
     let total_feeds = feeds.len() as u32;
 
-    for (i, &(ref feed, ref stats)) in feeds.iter().enumerate() {
+    for (i, (feed, stats)) in feeds.iter().enumerate() {
         feed.show_notification(stats, 1 + i as u32, total_feeds)?;
     }
 
