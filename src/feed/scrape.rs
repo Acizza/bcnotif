@@ -136,7 +136,7 @@ fn parse_listeners(node: &Node) -> Result<u32, ScrapeError> {
         .ok_or_else(|| ScrapeError::NoElement("feed listeners"))?;
 
     let result = text
-        .trim_right()
+        .trim_end()
         .parse::<u32>()
         .map_err(|e| ScrapeError::FailedIntParse(e, "feed listeners"))?;
 
