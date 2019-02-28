@@ -4,7 +4,8 @@ use crate::feed::Feed;
 use crate::path;
 use chrono::{Timelike, Utc};
 use csv;
-use std::collections::HashMap;
+use hashbrown::HashMap;
+use smallvec::{smallvec, SmallVec};
 use std::path::PathBuf;
 
 pub const DEFAULT_AVERAGES_FILE: &str = "averages.csv";
@@ -107,7 +108,7 @@ pub struct Average {
     /// The current average before the last call to self.add_sample().
     pub last: f32,
     /// The raw data that is used to calculate the current and last average.
-    pub data: Vec<i32>,
+    pub data: SmallVec<[i32; 5]>,
     /// The current data index.
     index: usize,
     /// This keeps track of how many samples have been added since the struct
@@ -121,7 +122,7 @@ impl Average {
         Average {
             current: 0.0,
             last: 0.0,
-            data: vec![0; sample_size],
+            data: smallvec![0; sample_size],
             index: 0,
             populated: 0,
         }
