@@ -1,104 +1,10 @@
 use crate::config::Config;
-use crate::error::StatisticsError;
-use crate::feed::Feed;
-use crate::path;
-use chrono::{Timelike, Utc};
-use csv;
-use hashbrown::HashMap;
+use crate::feed::FeedInfo;
 use smallvec::{smallvec, SmallVec};
-use std::path::PathBuf;
 
-pub const DEFAULT_AVERAGES_FILE: &str = "averages.csv";
+pub const NUM_HOURLY_STATS: usize = 24;
 
-type FeedID = u32;
-
-/// An interface to save and load `ListenerStats` data.
-pub struct AverageData {
-    /// The path to the file to save and load data from.
-    pub path: PathBuf,
-    /// The data to save and load.
-    pub data: HashMap<FeedID, ListenerStats>,
-}
-
-impl AverageData {
-    pub fn new(path: PathBuf) -> AverageData {
-        AverageData {
-            path,
-            data: HashMap::new(),
-        }
-    }
-
-    pub fn from_file(path: PathBuf) -> Result<AverageData, StatisticsError> {
-        let mut avg_data = AverageData::new(path.clone());
-
-        let hour = Utc::now().hour() as usize;
-        let mut rdr = csv::Reader::from_path(path)?;
-
-        for result in rdr.records() {
-            let record = result?;
-
-            if record.len() < 1 + ListenerStats::HOURLY_SIZE {
-                return Err(StatisticsError::TooFewRows);
-            }
-
-            let id = record[0].parse().map_err(StatisticsError::ParseIntError)?;
-            let mut averages = [0.0; ListenerStats::HOURLY_SIZE];
-
-            for i in 0..ListenerStats::HOURLY_SIZE {
-                // Use an offset of 1 to avoid capturing the feed ID field
-                averages[i] = record[1 + i]
-                    .parse::<f32>()
-                    .map_err(StatisticsError::ParseFloatError)?;
-            }
-
-            let listeners = averages[hour] as i32;
-
-            // Zero listeners means that data for the current hour doesn't exist yet
-            let stats = if listeners == 0 {
-                ListenerStats::with_hourly(averages)
-            } else {
-                ListenerStats::with_data(listeners, averages)
-            };
-
-            avg_data.data.insert(id, stats);
-        }
-
-        Ok(avg_data)
-    }
-
-    pub fn load() -> Result<AverageData, StatisticsError> {
-        let path = path::get_data_file(DEFAULT_AVERAGES_FILE)?;
-
-        if path.exists() {
-            AverageData::from_file(path)
-        } else {
-            Ok(AverageData::new(path))
-        }
-    }
-
-    pub fn save(&self) -> Result<(), StatisticsError> {
-        let mut wtr = csv::Writer::from_path(&self.path)?;
-        let mut fields = Vec::with_capacity(1 + ListenerStats::HOURLY_SIZE);
-
-        for (id, stats) in &self.data {
-            fields.push(id.to_string());
-
-            for average in &stats.average_hourly {
-                fields.push(average.round().to_string());
-            }
-
-            wtr.write_record(&fields)?;
-            fields.clear();
-        }
-
-        wtr.flush()?;
-        Ok(())
-    }
-
-    pub fn get_feed_stats(&mut self, feed: &Feed) -> &mut ListenerStats {
-        self.data.entry(feed.id).or_insert_with(ListenerStats::new)
-    }
-}
+pub type HourlyStats = [f32; NUM_HOURLY_STATS];
 
 /// Represents an average set of data that wraps around its specified sample size.
 #[derive(Debug, Clone)]
@@ -118,6 +24,8 @@ pub struct Average {
 }
 
 impl Average {
+    pub const DEFAULT_SAMPLE_SIZE: usize = 5;
+
     pub fn new(sample_size: usize) -> Average {
         Average {
             current: 0.0,
@@ -126,14 +34,6 @@ impl Average {
             index: 0,
             populated: 0,
         }
-    }
-
-    /// Creates a new Average with one initial sample.
-    pub fn with_value(sample_size: usize, value: i32) -> Average {
-        let mut average = Average::new(sample_size);
-        average.add_sample(value);
-
-        average
     }
 
     /// Adds a new sample to the data and calculates the new average.
@@ -156,6 +56,12 @@ impl Average {
     }
 }
 
+impl Default for Average {
+    fn default() -> Self {
+        Average::new(Average::DEFAULT_SAMPLE_SIZE)
+    }
+}
+
 /// Represents general statistical data for feeds.
 #[derive(Debug, Clone)]
 pub struct ListenerStats {
@@ -164,7 +70,7 @@ pub struct ListenerStats {
     /// Represents the average number of listeners before a consistent spike occured.
     pub unskewed_average: Option<f32>,
     /// Contains the average number of listeners for any given hour.
-    pub average_hourly: [f32; ListenerStats::HOURLY_SIZE],
+    pub average_hourly: HourlyStats,
     /// Indicates whether or not the listner count has spiked since the last update.
     pub has_spiked: bool,
     /// Represents the number of times the feed has spiked consecutively.
@@ -172,28 +78,14 @@ pub struct ListenerStats {
 }
 
 impl ListenerStats {
-    const AVERAGE_SIZE: usize = 5;
-    const HOURLY_SIZE: usize = 24;
-
     pub fn new() -> ListenerStats {
-        ListenerStats::with_hourly([0.0; ListenerStats::HOURLY_SIZE])
+        ListenerStats::with_hourly([0.0; NUM_HOURLY_STATS])
     }
 
     /// Creates a new ListenerStats struct with existing hourly data.
-    pub fn with_hourly(hourly: [f32; ListenerStats::HOURLY_SIZE]) -> ListenerStats {
+    pub fn with_hourly(hourly: HourlyStats) -> ListenerStats {
         ListenerStats {
-            average: Average::new(ListenerStats::AVERAGE_SIZE),
-            unskewed_average: None,
-            average_hourly: hourly,
-            has_spiked: false,
-            spike_count: 0,
-        }
-    }
-
-    /// Creates a new ListenerStats struct with existing listener and hourly listener data.
-    pub fn with_data(listeners: i32, hourly: [f32; ListenerStats::HOURLY_SIZE]) -> ListenerStats {
-        ListenerStats {
-            average: Average::with_value(ListenerStats::AVERAGE_SIZE, listeners),
+            average: Average::default(),
             unskewed_average: None,
             average_hourly: hourly,
             has_spiked: false,
@@ -202,7 +94,7 @@ impl ListenerStats {
     }
 
     /// Updates the listener data and determines if the feed has spiked
-    pub fn update(&mut self, hour: usize, feed: &Feed, config: &Config) {
+    pub fn update(&mut self, hour: usize, feed: &FeedInfo, config: &Config) {
         self.has_spiked = self.is_spiking(feed, config);
 
         self.spike_count = if self.has_spiked {
@@ -218,7 +110,7 @@ impl ListenerStats {
 
     /// Returns true if the specified feed is currently spiking in listeners
     /// based off of previous data collected by self.update().
-    fn is_spiking(&self, feed: &Feed, config: &Config) -> bool {
+    fn is_spiking(&self, feed: &FeedInfo, config: &Config) -> bool {
         if self.average.current == 0.0 {
             return false;
         }

@@ -19,19 +19,18 @@ pub enum Error {
 
     #[fail(display = "feed error")]
     Feed(#[cause] FeedError),
-
-    #[fail(display = "statistics error")]
-    Statistics(#[cause] StatisticsError),
 }
 
 impl_error_conversion!(Error,
     ConfigError => Config,
     FeedError => Feed,
-    StatisticsError => Statistics,
 );
 
 #[derive(Fail, Debug)]
 pub enum FeedError {
+    #[fail(display = "io error")]
+    Io(#[cause] ::std::io::Error),
+
     #[fail(display = "HTTP error")]
     Reqwest(#[cause] ::reqwest::Error),
 
@@ -43,10 +42,14 @@ pub enum FeedError {
 
     #[fail(display = "failed to create notification")]
     FailedToCreateNotification,
+
+    #[fail(display = "malformed csv data")]
+    MalformedCSV,
 }
 
 impl_error_conversion!(FeedError,
-    ::reqwest::Error => Reqwest,
+    std::io::Error => Io,
+    reqwest::Error => Reqwest,
 );
 
 type ElementName = &'static str;
@@ -62,29 +65,6 @@ pub enum ScrapeError {
     #[fail(display = "no feeds found")]
     NoneFound,
 }
-
-#[derive(Fail, Debug)]
-pub enum StatisticsError {
-    #[fail(display = "CSV error")]
-    CSV(#[cause] ::csv::Error),
-
-    #[fail(display = "io error")]
-    Io(#[cause] ::std::io::Error),
-
-    #[fail(display = "failed to parse integer")]
-    ParseIntError(#[cause] ::std::num::ParseIntError),
-
-    #[fail(display = "failed to parse float")]
-    ParseFloatError(#[cause] ::std::num::ParseFloatError),
-
-    #[fail(display = "CSV file contains record with too few rows")]
-    TooFewRows,
-}
-
-impl_error_conversion!(StatisticsError,
-    ::csv::Error => CSV,
-    ::std::io::Error => Io,
-);
 
 #[derive(Fail, Debug)]
 pub enum ConfigError {

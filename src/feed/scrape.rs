@@ -1,10 +1,10 @@
 use crate::error::ScrapeError;
-use crate::feed::{Feed, State};
+use crate::feed::{FeedInfo, State};
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Class, Name, Predicate};
 
-pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, ScrapeError> {
+pub fn scrape_top<'a>(body: &str) -> Result<Vec<FeedInfo<'a>>, ScrapeError> {
     let doc = Document::from(body);
 
     let feed_data = doc.find(Class("btable").descendant(Name("tr"))).skip(1);
@@ -38,7 +38,7 @@ pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, ScrapeError> {
             _ => "Numerous".to_string(),
         };
 
-        feeds.push(Feed {
+        feeds.push(FeedInfo {
             id,
             state: State::new(state_id, state_abbrev),
             county,
@@ -58,7 +58,7 @@ pub fn scrape_top<'a>(body: &str) -> Result<Vec<Feed<'a>>, ScrapeError> {
     Ok(feeds)
 }
 
-pub fn scrape_state<'a>(state: &State<'a>, body: &str) -> Result<Vec<Feed<'a>>, ScrapeError> {
+pub fn scrape_state<'a>(state: &State<'a>, body: &str) -> Result<Vec<FeedInfo<'a>>, ScrapeError> {
     let doc = Document::from(body);
 
     // TODO: add support for areawide feeds
@@ -95,7 +95,7 @@ pub fn scrape_state<'a>(state: &State<'a>, body: &str) -> Result<Vec<Feed<'a>>, 
             .next()
             .map(|alert| alert.text());
 
-        feeds.push(Feed {
+        feeds.push(FeedInfo {
             id,
             state: state.clone(),
             county,

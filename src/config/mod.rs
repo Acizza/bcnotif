@@ -2,7 +2,7 @@
 mod generation;
 
 use crate::error::ConfigError;
-use crate::feed::Feed;
+use crate::feed::FeedInfo;
 use crate::path;
 use chrono::{Datelike, Local};
 use std::path::Path;
@@ -72,7 +72,7 @@ impl Config {
 
     /// Gets the spike values for the specified feed based off of
     /// other configuration values that may be set.
-    pub fn get_feed_spike(&self, feed: &Feed) -> &Spike {
+    pub fn get_feed_spike(&self, feed: &FeedInfo) -> &Spike {
         // Find any settings for the specified feed
         let feed_setting = self
             .feed_settings
@@ -110,7 +110,7 @@ create_config_enum!(FeedIdent,
 
 impl FeedIdent {
     /// Returns true if the FeedIdent matches the corresponding feed data.
-    pub fn matches_feed(&self, feed: &Feed) -> bool {
+    pub fn matches_feed(&self, feed: &FeedInfo) -> bool {
         match self {
             FeedIdent::Name(name) => *name == feed.name,
             FeedIdent::ID(id) => *id == feed.id,

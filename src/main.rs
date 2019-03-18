@@ -3,13 +3,14 @@ mod error;
 mod feed;
 mod path;
 
-use crate::feed::statistics::{AverageData, ListenerStats};
-use crate::feed::Feed;
+use crate::feed::stats::ListenerStats;
+use crate::feed::{FeedData, FeedDisplay};
 use chrono::{Timelike, Utc};
-use clap::clap_app;
+use clap::{clap_app, ArgMatches};
 use config::Config;
 use error::Error;
 use notify_rust::Notification;
+use smallvec::SmallVec;
 use std::time::Duration;
 
 fn main() {
@@ -18,7 +19,6 @@ fn main() {
         (author: env!("CARGO_PKG_AUTHORS"))
         (@arg DONT_SAVE_DATA: --nosave "Don't save feed data")
         (@arg RELOAD_CONFIG: -r --reloadconfig "Reload the configuration file on every update")
-        (@arg PRINT_FEED_DATA: --printdata "Print detailed feed data / statistics on every update")
     )
     .get_matches();
 
@@ -32,15 +32,24 @@ fn main() {
 }
 
 fn run(args: clap::ArgMatches) -> Result<(), Error> {
-    let mut averages = AverageData::load()?;
     let mut config = Config::load()?;
+
+    let mut feed_data = {
+        let path = FeedData::default_path()?;
+
+        if path.exists() {
+            FeedData::load(path)?
+        } else {
+            FeedData::new(path)
+        }
+    };
 
     loop {
         if args.is_present("RELOAD_CONFIG") {
             config = Config::load()?;
         }
 
-        match perform_update(&mut averages, &args, &config) {
+        match run_update(&mut feed_data, &args, &config) {
             Ok(_) => (),
             Err(err) => display_error(err),
         }
@@ -68,57 +77,51 @@ where
     }
 
     Notification::new()
-        .summary(&format!("Error in {}", env!("CARGO_PKG_NAME")))
+        .summary(concat!(env!("CARGO_PKG_NAME"), " error"))
         .body(&err.to_string())
         .show()
         .ok();
 }
 
-fn perform_update(
-    averages: &mut AverageData,
-    args: &clap::ArgMatches,
-    config: &Config,
-) -> Result<(), Error> {
+fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> Result<(), Error> {
+    let feed_info = feed::scrape_all(config)?;
     let hour = Utc::now().hour() as usize;
-    let mut display_feeds = Vec::new();
+    let mut displayed = SmallVec::<[FeedDisplay; 3]>::new();
 
-    let feeds = feed::scrape_all(config)?
-        .into_iter()
-        .filter(|feed| feed.listeners >= config.misc.minimum_listeners);
-
-    for feed in feeds {
-        let stats = averages.get_feed_stats(&feed);
-        stats.update(hour, &feed, config);
-
-        if args.is_present("PRINT_FEED_DATA") {
-            print_info(&feed, stats);
+    for info in feed_info {
+        if info.listeners < config.misc.minimum_listeners {
+            continue;
         }
 
-        if let Some(max_times) = config.misc.max_times_to_show_feed {
-            if stats.spike_count > max_times {
-                continue;
-            }
+        let stats = feed_data
+            .stats
+            .entry(info.id)
+            .or_insert_with(ListenerStats::new);
+
+        stats.update(hour, &info, config);
+
+        if !feed::should_be_displayed(&info, &stats, config) {
+            continue;
         }
 
-        let show_for_alert = feed.alert.is_some() && config.misc.show_alert_feeds;
-        let can_show = stats.has_spiked || show_for_alert;
-
-        if can_show && (display_feeds.len() as u32) < config.misc.max_feeds {
-            display_feeds.push((feed, stats.clone()));
+        if displayed.len() > config.misc.max_feeds as usize {
+            continue;
         }
+
+        displayed.push(FeedDisplay::from(info, stats));
     }
 
-    sort_feeds(&mut display_feeds, config);
-    show_feeds(&display_feeds)?;
+    sort_feeds(&mut displayed, config);
+    show_feeds(&displayed)?;
 
     if !args.is_present("DONT_SAVE_DATA") {
-        averages.save()?;
+        feed_data.save()?;
     }
 
     Ok(())
 }
 
-fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
+fn sort_feeds(feeds: &mut [FeedDisplay], config: &Config) {
     use config::{SortOrder, SortType};
 
     feeds.sort_unstable_by(|x, y| {
@@ -127,14 +130,11 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
             SortOrder::Descending => (y, x),
         };
 
-        let (x_feed, x_stats) = x;
-        let (y_feed, y_stats) = y;
-
         match config.sorting.sort_type {
-            SortType::Listeners => x_feed.listeners.cmp(&y_feed.listeners),
+            SortType::Listeners => x.info.listeners.cmp(&y.info.listeners),
             SortType::Jump => {
-                let x_jump = x_stats.get_jump(x_feed.listeners) as i32;
-                let y_jump = y_stats.get_jump(y_feed.listeners) as i32;
+                let x_jump = x.jump as i32;
+                let y_jump = y.jump as i32;
 
                 x_jump.cmp(&y_jump)
             }
@@ -142,26 +142,12 @@ fn sort_feeds(feeds: &mut Vec<(Feed, ListenerStats)>, config: &Config) {
     });
 }
 
-fn show_feeds(feeds: &[(Feed, ListenerStats)]) -> Result<(), Error> {
+fn show_feeds(feeds: &[FeedDisplay]) -> Result<(), Error> {
     let total_feeds = feeds.len() as u32;
 
-    for (i, (feed, stats)) in feeds.iter().enumerate() {
-        feed.show_notification(stats, 1 + i as u32, total_feeds)?;
+    for (i, feed) in feeds.iter().enumerate() {
+        feed.show_notif(1 + i as u32, total_feeds)?;
     }
 
     Ok(())
-}
-
-fn print_info(feed: &Feed, stats: &ListenerStats) {
-    println!("[{}] {}", feed.id, feed.name);
-    println!("\tlisteners    | {}", feed.listeners);
-
-    println!(
-        "\taverage lis. | cur: {} last: {} samples: {:?}",
-        stats.average.current, stats.average.last, stats.average.data
-    );
-
-    println!("\tunskewed avg | {:?}", stats.unskewed_average);
-    println!("\thas spiked   | {}", stats.has_spiked);
-    println!("\ttimes spiked | {}", stats.spike_count);
 }
