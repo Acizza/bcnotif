@@ -2,13 +2,13 @@
 mod generation;
 
 use crate::error::ConfigError;
-use crate::feed::FeedInfo;
+use crate::feed::{FeedInfo, Location};
 use crate::path;
 use chrono::{Datelike, Local};
 use std::path::Path;
 use yaml_rust::{Yaml, YamlLoader};
 
-pub const DEFAULT_CONFIG_NAME: &str = "config.toml";
+pub const DEFAULT_CONFIG_NAME: &str = "config.yaml";
 
 macro_rules! gen_base_parse_stmt {
     (optional, $category:expr, $doc:ident) => {
@@ -115,7 +115,9 @@ impl FeedIdent {
             FeedIdent::Name(name) => *name == feed.name,
             FeedIdent::ID(id) => *id == feed.id,
             FeedIdent::County(c) => *c == feed.county,
-            FeedIdent::State(id) => *id == feed.state.id,
+            FeedIdent::State(id) => match feed.location {
+                Location::FromTop50(loc_id, _) | Location::FromState(loc_id) => *id == loc_id,
+            },
         }
     }
 }

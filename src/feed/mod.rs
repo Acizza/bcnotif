@@ -16,118 +16,75 @@ use std::io::{BufRead, BufReader};
 use std::mem;
 use std::path::PathBuf;
 
-pub const BROADCASTIFY_URL: &str = "https://www.broadcastify.com";
-
 type FeedID = u32;
 
+lazy_static! {
+    static ref CLIENT: reqwest::Client = reqwest::Client::new();
+}
+
 #[derive(Debug)]
-pub struct FeedInfo<'a> {
+pub struct FeedInfo {
     pub id: FeedID,
     pub name: String,
     pub listeners: u32,
-    pub state: State<'a>,
+    pub location: Location,
     pub county: String,
     pub alert: Option<String>,
 }
 
-impl<'a> PartialEq for FeedInfo<'a> {
+impl FeedInfo {
+    pub fn scrape_from_source(source: FeedSource) -> Result<Vec<FeedInfo>, FeedError> {
+        let body = CLIENT.get(source.as_url_str().as_ref()).send()?.text()?;
+
+        match source {
+            FeedSource::Top50 => scrape::scrape_top(&body).map_err(FeedError::ParseTopFeeds),
+            FeedSource::State(id) => {
+                scrape::scrape_state(id, &body).map_err(|err| FeedError::ParseStateFeeds(err, id))
+            }
+        }
+    }
+
+    pub fn scrape_from_config(config: &Config) -> Result<Vec<FeedInfo>, FeedError> {
+        let mut feeds = FeedInfo::scrape_from_source(FeedSource::Top50)?;
+
+        if let Some(state_id) = config.misc.state_feeds_id {
+            let state_feeds = FeedInfo::scrape_from_source(FeedSource::State(state_id))?;
+            feeds.reserve(state_feeds.len());
+            feeds.extend(state_feeds);
+        }
+
+        feeds.sort_unstable_by_key(|feed| feed.id);
+        feeds.dedup();
+
+        Ok(feeds)
+    }
+}
+
+impl PartialEq for FeedInfo {
     fn eq(&self, other: &FeedInfo) -> bool {
         self.id == other.id
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct State<'a> {
-    pub id: u32,
-    pub abbrev: Cow<'a, str>,
+#[derive(Debug)]
+pub enum Location {
+    FromTop50(u32, String),
+    FromState(u32),
 }
 
-impl<'a> State<'a> {
-    pub fn new<S>(id: u32, abbrev: S) -> State<'a>
-    where
-        S: Into<Cow<'a, str>>,
-    {
-        State {
-            id,
-            abbrev: abbrev.into(),
-        }
-    }
+pub enum FeedSource {
+    Top50,
+    State(u32),
 }
 
-pub enum FeedSource<'a> {
-    Top,
-    State(State<'a>),
-}
-
-impl<'a> FeedSource<'a> {
-    fn get_url(&self) -> String {
-        match *self {
-            FeedSource::Top => {
-                // This should be be converted to use the concat! macro if it
-                // ever gains support for constants
-                format!("{}/listen/top", BROADCASTIFY_URL)
-            }
-            FeedSource::State(ref state) => {
-                format!("{}/listen/stid/{}", BROADCASTIFY_URL, state.id)
-            }
-        }
-    }
-
-    fn download_page(&self, client: &reqwest::Client) -> reqwest::Result<String> {
-        let body = client.get(&self.get_url()).send()?.text()?;
-        Ok(body)
-    }
-
-    fn scrape(self, client: &reqwest::Client) -> Result<Vec<FeedInfo<'a>>, FeedError> {
-        let body = self.download_page(client)?;
-
+impl FeedSource {
+    pub fn as_url_str(&self) -> Cow<str> {
         match self {
-            FeedSource::Top => scrape::scrape_top(&body).map_err(FeedError::ParseTopFeeds),
-            FeedSource::State(ref state) => scrape::scrape_state(state, &body)
-                .map_err(|e| FeedError::ParseStateFeeds(e, state.abbrev.to_string())),
+            FeedSource::Top50 => Cow::Borrowed("https://www.broadcastify.com/listen/top"),
+            FeedSource::State(id) => {
+                format!("https://www.broadcastify.com/listen/stid/{}", id).into()
+            }
         }
-    }
-}
-
-pub fn scrape_all(config: &Config) -> Result<Vec<FeedInfo>, FeedError> {
-    lazy_static! {
-        static ref CLIENT: reqwest::Client = reqwest::Client::new();
-    }
-
-    let mut feeds = FeedSource::Top.scrape(&CLIENT)?;
-
-    if let Some(state_id) = config.misc.state_feeds_id {
-        let state = State::new(state_id, "CS"); // CS = Config Specified
-        let state_feeds = FeedSource::State(state).scrape(&CLIENT)?;
-
-        feeds.extend(state_feeds);
-    }
-
-    filter_whitelist_blacklist(config, &mut feeds);
-
-    feeds.sort_by_key(|feed| feed.id);
-    feeds.dedup();
-
-    Ok(feeds)
-}
-
-fn filter_whitelist_blacklist(config: &Config, feeds: &mut Vec<FeedInfo>) {
-    if !config.whitelist.is_empty() {
-        feeds.retain(|feed| {
-            config
-                .whitelist
-                .iter()
-                .any(|entry| entry.matches_feed(feed))
-        });
-    }
-
-    if !config.blacklist.is_empty() {
-        feeds.retain(|feed| {
-            config
-                .blacklist
-                .iter()
-                .any(|entry| !entry.matches_feed(feed))
-        });
     }
 }
 
@@ -220,15 +177,15 @@ impl FeedData {
 }
 
 #[derive(Debug)]
-pub struct FeedDisplay<'a> {
-    pub info: FeedInfo<'a>,
+pub struct FeedDisplay {
+    pub info: FeedInfo,
     pub jump: f32,
     pub spike_count: u32,
     pub has_spiked: bool,
 }
 
-impl<'a> FeedDisplay<'a> {
-    pub fn from(info: FeedInfo<'a>, stats: &ListenerStats) -> FeedDisplay<'a> {
+impl FeedDisplay {
+    pub fn from(info: FeedInfo, stats: &ListenerStats) -> FeedDisplay {
         let jump = stats.get_jump(info.listeners);
 
         FeedDisplay {
@@ -252,9 +209,14 @@ impl<'a> FeedDisplay<'a> {
             None => Cow::Borrowed(""),
         };
 
+        let state = match &self.info.location {
+            Location::FromTop50(_, name) => name.as_ref(),
+            Location::FromState(_) => "CS",
+        };
+
         let body = format!(
             "{state} | {name}\n{listeners} (^{jump}){alert}",
-            state = self.info.state.abbrev,
+            state = state,
             name = self.info.name,
             listeners = self.info.listeners,
             jump = self.jump as i32,

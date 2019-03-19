@@ -4,7 +4,7 @@ mod feed;
 mod path;
 
 use crate::feed::stats::ListenerStats;
-use crate::feed::{FeedData, FeedDisplay};
+use crate::feed::{FeedData, FeedDisplay, FeedInfo};
 use chrono::{Timelike, Utc};
 use clap::{clap_app, ArgMatches};
 use config::Config;
@@ -84,7 +84,12 @@ where
 }
 
 fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> Result<(), Error> {
-    let feed_info = feed::scrape_all(config)?;
+    let feed_info = {
+        let mut feeds = FeedInfo::scrape_from_config(config)?;
+        filter_feeds(config, &mut feeds);
+        feeds
+    };
+
     let hour = Utc::now().hour() as usize;
     let mut displayed = SmallVec::<[FeedDisplay; 3]>::new();
 
@@ -119,6 +124,26 @@ fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> R
     }
 
     Ok(())
+}
+
+fn filter_feeds(config: &Config, feeds: &mut Vec<FeedInfo>) {
+    if !config.whitelist.is_empty() {
+        feeds.retain(|feed| {
+            config
+                .whitelist
+                .iter()
+                .any(|entry| entry.matches_feed(feed))
+        });
+    }
+
+    if !config.blacklist.is_empty() {
+        feeds.retain(|feed| {
+            config
+                .blacklist
+                .iter()
+                .any(|entry| !entry.matches_feed(feed))
+        });
+    }
 }
 
 fn sort_feeds(feeds: &mut [FeedDisplay], config: &Config) {

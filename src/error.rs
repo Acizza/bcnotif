@@ -38,7 +38,7 @@ pub enum FeedError {
     ParseTopFeeds(#[cause] ScrapeError),
 
     #[fail(display = "failed to parse state ({}) feeds", _1)]
-    ParseStateFeeds(#[cause] ScrapeError, String),
+    ParseStateFeeds(#[cause] ScrapeError, u32),
 
     #[fail(display = "failed to create notification")]
     FailedToCreateNotification,
