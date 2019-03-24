@@ -1,108 +1,63 @@
 use crate::error::ScrapeError;
 use crate::feed::{FeedInfo, Location};
-use select::document::Document;
-use select::node::Node;
-use select::predicate::{Class, Name, Predicate};
+use smallvec::SmallVec;
 
-pub fn scrape_top(body: &str) -> Result<Vec<FeedInfo>, ScrapeError> {
-    let doc = Document::from(body);
-
-    let feed_data = doc.find(Class("btable").descendant(Name("tr"))).skip(1);
-    let mut feeds = Vec::new();
-
-    for row in feed_data {
-        let (id, name) = parse_id_and_name(&row, "w100")?;
-
-        // The top 50 feed list allows multiple states and/or counties to appear,
-        // so we can't assume their location
-        let location_info = row
-            .find(Name("td"))
-            .nth(1)
-            .ok_or_else(|| ScrapeError::NoElement("location"))?;
-
-        let mut hyperlinks = location_info
-            .find(Name("a"))
-            .filter_map(|link| link.attr("href").map(|url| (url, link.text())));
-
-        let (state_link, state_abbrev) = hyperlinks
-            .next()
-            .ok_or_else(|| ScrapeError::NoElement("state data"))?;
-
-        let state_id = parse_link_id(state_link)
-            .ok_or_else(|| ScrapeError::NoElement("state id"))?
-            .parse::<u32>()
-            .map_err(|e| ScrapeError::FailedIntParse(e, "state id"))?;
-
-        let county = match hyperlinks.next() {
-            Some((link, ref text)) if link.starts_with("/listen/ctid") => text.clone(),
-            _ => "Numerous".to_string(),
-        };
-
-        feeds.push(FeedInfo {
-            id,
-            location: Location::FromTop50(state_id, state_abbrev),
-            county,
-            name,
-            listeners: parse_listeners(&row)?,
-            alert: row
-                .find(Class("messageBox"))
-                .next()
-                .map(|alert| alert.text()),
-        });
-    }
-
-    if feeds.is_empty() {
-        return Err(ScrapeError::NoneFound);
-    }
-
-    Ok(feeds)
-}
-
-pub fn scrape_state(state_id: u32, body: &str) -> Result<Vec<FeedInfo>, ScrapeError> {
-    let doc = Document::from(body);
-
-    // TODO: add support for areawide feeds
+pub fn scrape_top<S>(body: S) -> Result<Vec<FeedInfo>, ScrapeError>
+where
+    S: AsRef<str>,
+{
     let table = {
-        // State feed pages may contain a section for areawide feeds that appears
-        // before the main feed data. Since the parsing logic for that hasn't been
-        // implemented yet, we simply skip over that table
-        let tables = doc.find(Class("btable")).take(2).collect::<Vec<_>>();
-
-        if tables.is_empty() {
-            return Err(ScrapeError::NoElement("feed data"));
-        } else if tables.len() >= 2 {
-            tables[1]
-        } else {
-            tables[0]
-        }
+        let mut body = body.as_ref();
+        advance_str(&mut body, "<table class=\"btable\"")?;
+        parse_tag_body_upto(body, "</table>")?
     };
 
-    let feed_data = table.find(Class("btable").descendant(Name("tr")));
+    let mut feeds = Vec::with_capacity(50);
 
-    let mut feeds = Vec::new();
+    for row in table.split("<tr>").skip(2) {
+        let columns = parse_tr_entries(row, 3)?;
 
-    for feed in feed_data.skip(1) {
-        let (id, name) = parse_id_and_name(&feed, "w1p")?;
+        let listeners = columns[0]
+            .trim_end()
+            .parse::<u32>()
+            .map_err(|e| ScrapeError::FailedIntParse(e, "listeners"))?;
 
-        let county = feed
-            .find(Name("a"))
-            .next()
-            .map(|node| node.text())
-            .unwrap_or_else(|| "Numerous".to_string());
+        let (location, county) = {
+            let links = columns[1].splitn(3, "<a").collect::<SmallVec<[&str; 3]>>();
 
-        let alert = feed
-            .find(Name("font").and(Class("fontRed")))
-            .next()
-            .map(|alert| alert.text());
+            if links.len() <= 1 {
+                return Err(ScrapeError::NoLocationInfo);
+            }
 
-        feeds.push(FeedInfo {
-            id,
-            location: Location::FromState(state_id),
-            county,
-            name,
-            listeners: parse_listeners(&feed)?,
-            alert,
+            let state_info = Link::parse(&links[1])?;
+            let location = Location::FromTop50(state_info.href_id, state_info.value.to_string());
+
+            let county = if links.len() > 2 {
+                parse_tag_body(&links[2])?.to_string()
+            } else {
+                "Numerous".to_string()
+            };
+
+            (location, county)
+        };
+
+        let id_name_link = Link::parse(&columns[2])?;
+
+        let alert = columns[2].find("<div").and_then(|idx| {
+            let body = parse_tag_body_upto(&columns[2][idx..], "</div").ok()?;
+            Some(body.to_string())
         });
+
+        let feed = FeedInfo {
+            id: id_name_link.href_id,
+            name: id_name_link.value.into(),
+            listeners,
+            location,
+            county,
+            alert,
+        };
+
+        feeds.push(feed);
     }
 
     if feeds.is_empty() {
@@ -112,43 +67,157 @@ pub fn scrape_state(state_id: u32, body: &str) -> Result<Vec<FeedInfo>, ScrapeEr
     Ok(feeds)
 }
 
-fn parse_id_and_name(node: &Node, class_name: &str) -> Result<(u32, String), ScrapeError> {
-    let base = node
-        .find(Class(class_name).descendant(Name("a")))
-        .next()
-        .ok_or_else(|| ScrapeError::NoElement("id and name"))?;
+pub fn scrape_state<S>(state_id: u32, body: S) -> Result<Vec<FeedInfo>, ScrapeError>
+where
+    S: AsRef<str>,
+{
+    let table = {
+        let mut body = body.as_ref();
 
-    let id = base
-        .attr("href")
-        .and_then(parse_link_id)
-        .ok_or_else(|| ScrapeError::NoElement("feed id"))?
-        .parse::<u32>()
-        .map_err(|e| ScrapeError::FailedIntParse(e, "state id"))?;
+        // State feeds have two tables with the same class
+        advance_str(&mut body, "<table class=\"btable\"")?;
+        advance_str(&mut body, "<table class=\"btable\"")?;
 
-    Ok((id, base.text()))
+        parse_tag_body_upto(body, "</table>")?
+    };
+
+    let mut feeds = Vec::with_capacity(200);
+
+    for row in table.split("<tr>").skip(2) {
+        let columns = parse_tr_entries(row, 4)?;
+
+        let county = parse_tag_body(&columns[0])?;
+        let id_name_link = Link::parse(&columns[1])?;
+
+        let alert = columns[1].find("<font").and_then(|idx| {
+            let value = parse_tag_body_upto(&columns[1][idx..], "</font").ok()?;
+            Some(value.to_string())
+        });
+
+        let listeners = get_str_upto_ch(&columns[3], '<')?
+            .parse::<u32>()
+            .map_err(|e| ScrapeError::FailedIntParse(e, "listeners"))?;
+
+        let feed = FeedInfo {
+            id: id_name_link.href_id,
+            name: id_name_link.value.into(),
+            listeners,
+            location: Location::FromState(state_id),
+            county: county.into(),
+            alert,
+        };
+
+        feeds.push(feed);
+    }
+
+    if feeds.is_empty() {
+        return Err(ScrapeError::NoneFound);
+    }
+
+    Ok(feeds)
 }
 
-fn parse_listeners(node: &Node) -> Result<u32, ScrapeError> {
-    let text = node
-        .find(Class("c").and(Class("m")))
-        .next()
-        .map(|node| node.text())
-        .ok_or_else(|| ScrapeError::NoElement("feed listeners"))?;
+fn parse_tr_entries(row: &str, num: usize) -> Result<SmallVec<[&str; 4]>, ScrapeError> {
+    let mut result = SmallVec::with_capacity(num);
 
-    let result = text
-        .trim_end()
-        .parse::<u32>()
-        .map_err(|e| ScrapeError::FailedIntParse(e, "feed listeners"))?;
+    for split in row.splitn(num + 1, "<td").skip(1) {
+        let value = parse_tag_body_upto(split, "</td")?;
+        result.push(value);
+    }
+
+    if result.len() < num {
+        return Err(ScrapeError::InvalidNumberOfColumns);
+    }
 
     Ok(result)
 }
 
-fn parse_link_id(url: &str) -> Option<String> {
-    let pos = url.rfind('/')?;
+fn advance_str(s: &mut &str, search_str: &str) -> Result<(), ScrapeError> {
+    let idx = s
+        .find(search_str)
+        .ok_or_else(|| ScrapeError::SearchStringNotFound(search_str.into()))?;
 
-    if pos + 1 >= url.len() {
-        None
-    } else {
-        Some(url[pos + 1..].to_string())
+    *s = &s[idx + search_str.len()..];
+
+    Ok(())
+}
+
+fn advance_str_ch(s: &mut &str, search_ch: char) -> Result<(), ScrapeError> {
+    let idx = s
+        .find(search_ch)
+        .ok_or_else(|| ScrapeError::SearchStringNotFound(search_ch.to_string()))?;
+
+    *s = &s[idx + 1..];
+
+    Ok(())
+}
+
+fn take_str_upto(s: &mut &str, end: &str) -> Result<(), ScrapeError> {
+    let idx = s
+        .find(end)
+        .ok_or_else(|| ScrapeError::SearchStringNotFound(end.into()))?;
+
+    *s = &s[..idx];
+
+    Ok(())
+}
+
+fn get_str_upto_ch(s: &str, end: char) -> Result<&str, ScrapeError> {
+    let idx = s
+        .find(end)
+        .ok_or_else(|| ScrapeError::SearchStringNotFound(end.to_string()))?;
+
+    let value = &s[..idx];
+
+    Ok(value)
+}
+
+struct Link<'a> {
+    href_id: u32,
+    value: &'a str,
+}
+
+impl<'a> Link<'a> {
+    fn new(href_id: u32, value: &'a str) -> Link<'a> {
+        Link { href_id, value }
     }
+
+    fn parse(mut body: &'a str) -> Result<Link<'a>, ScrapeError> {
+        advance_str(&mut body, "href=\"")?;
+
+        let href_id = {
+            let end = body
+                .find('\"')
+                .ok_or_else(|| ScrapeError::SearchStringNotFound("\"".into()))?;
+
+            let value = &body[..end];
+
+            let id_idx = value
+                .rfind('/')
+                .ok_or_else(|| ScrapeError::SearchStringNotFound("/".into()))?;
+
+            let id = value[id_idx + 1..]
+                .parse::<u32>()
+                .map_err(|e| ScrapeError::FailedIntParse(e, "link id"))?;
+
+            // This assumes that the href attribute is the last one in the element
+            body = &body[end + "\">".len()..];
+            id
+        };
+
+        take_str_upto(&mut body, "</a")?;
+
+        Ok(Link::new(href_id, body))
+    }
+}
+
+fn parse_tag_body(body: &str) -> Result<&str, ScrapeError> {
+    parse_tag_body_upto(body, "</")
+}
+
+fn parse_tag_body_upto<'a>(mut body: &'a str, tag: &str) -> Result<&'a str, ScrapeError> {
+    advance_str_ch(&mut body, '>')?;
+    take_str_upto(&mut body, tag)?;
+
+    Ok(body)
 }

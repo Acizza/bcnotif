@@ -56,14 +56,20 @@ type ElementName = &'static str;
 
 #[derive(Fail, Debug)]
 pub enum ScrapeError {
-    #[fail(display = "unable to find element that contains {} information", _0)]
-    NoElement(ElementName),
-
     #[fail(display = "unable to parse {} information", _1)]
     FailedIntParse(#[cause] ::std::num::ParseIntError, ElementName),
 
     #[fail(display = "no feeds found")]
     NoneFound,
+
+    #[fail(display = "search string not found: {}", _0)]
+    SearchStringNotFound(String),
+
+    #[fail(display = "feed table has an invalid number of columns")]
+    InvalidNumberOfColumns,
+
+    #[fail(display = "feed did not have location info")]
+    NoLocationInfo,
 }
 
 #[derive(Fail, Debug)]
