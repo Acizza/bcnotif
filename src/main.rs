@@ -44,8 +44,10 @@ fn run(args: clap::ArgMatches) -> Result<(), Error> {
         }
     };
 
+    let reload_config = args.is_present("RELOAD_CONFIG");
+
     loop {
-        if args.is_present("RELOAD_CONFIG") {
+        if reload_config {
             config = Config::load()?;
         }
 
