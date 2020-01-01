@@ -1,18 +1,16 @@
 use directories::ProjectDirs;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
-lazy_static! {
-    static ref PROJECT_DIRS: ProjectDirs = {
-        let dirs = ProjectDirs::from("", "", env!("CARGO_PKG_NAME"));
+static PROJECT_DIRS: Lazy<ProjectDirs> = Lazy::new(|| {
+    let dirs = ProjectDirs::from("", "", env!("CARGO_PKG_NAME"));
 
-        match dirs {
-            Some(dirs) => dirs,
-            None => panic!("failed to get user directories"),
-        }
-    };
-}
+    match dirs {
+        Some(dirs) => dirs,
+        None => panic!("failed to get user directories"),
+    }
+});
 
 fn get_path(dir: &Path, filename: &str) -> io::Result<PathBuf> {
     if !dir.exists() {

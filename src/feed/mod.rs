@@ -5,9 +5,9 @@ mod scrape;
 use crate::config::Config;
 use crate::error::FeedError;
 use crate::path;
-use lazy_static::lazy_static;
 use notify_rust::Notification;
-use reqwest;
+use once_cell::sync::Lazy;
+use reqwest::Client;
 use stats::ListenerStats;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -17,10 +17,6 @@ use std::mem;
 use std::path::PathBuf;
 
 type FeedID = u32;
-
-lazy_static! {
-    static ref CLIENT: reqwest::Client = reqwest::Client::new();
-}
 
 #[derive(Debug)]
 pub struct FeedInfo {
@@ -34,6 +30,8 @@ pub struct FeedInfo {
 
 impl FeedInfo {
     pub fn scrape_from_source(source: FeedSource) -> Result<Vec<FeedInfo>, FeedError> {
+        static CLIENT: Lazy<Client> = Lazy::new(Client::new);
+
         let body = CLIENT.get(source.as_url_str().as_ref()).send()?.text()?;
 
         match source {
