@@ -7,7 +7,7 @@ use crate::error::FeedError;
 use crate::path;
 use notify_rust::Notification;
 use once_cell::sync::Lazy;
-use reqwest::Client;
+use reqwest::blocking::Client;
 use stats::ListenerStats;
 use std::borrow::Cow;
 use std::collections::HashMap;
