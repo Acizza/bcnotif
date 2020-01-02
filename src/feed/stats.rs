@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::feed::FeedInfo;
+use crate::feed::Feed;
 use smallvec::{smallvec, SmallVec};
 
 pub const NUM_HOURLY_STATS: usize = 24;
@@ -94,7 +94,7 @@ impl ListenerStats {
     }
 
     /// Updates the listener data and determines if the feed has spiked
-    pub fn update(&mut self, hour: usize, feed: &FeedInfo, config: &Config) {
+    pub fn update(&mut self, hour: usize, feed: &Feed, config: &Config) {
         self.has_spiked = self.is_spiking(feed, config);
 
         self.spike_count = if self.has_spiked {
@@ -110,7 +110,7 @@ impl ListenerStats {
 
     /// Returns true if the specified feed is currently spiking in listeners
     /// based off of previous data collected by self.update().
-    fn is_spiking(&self, feed: &FeedInfo, config: &Config) -> bool {
+    fn is_spiking(&self, feed: &Feed, config: &Config) -> bool {
         if self.average.current == 0.0 {
             return false;
         }

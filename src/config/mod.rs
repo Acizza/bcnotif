@@ -2,7 +2,7 @@
 mod generation;
 
 use crate::err::Result;
-use crate::feed::{FeedInfo, Location};
+use crate::feed::Feed;
 use crate::path::FilePath;
 use chrono::{Datelike, Local};
 use std::path::Path;
@@ -73,7 +73,7 @@ impl Config {
 
     /// Gets the spike values for the specified feed based off of
     /// other configuration values that may be set.
-    pub fn get_feed_spike(&self, feed: &FeedInfo) -> &Spike {
+    pub fn get_feed_spike(&self, feed: &Feed) -> &Spike {
         // Find any settings for the specified feed
         let feed_setting = self
             .feed_settings
@@ -111,14 +111,12 @@ create_config_enum!(FeedIdent,
 
 impl FeedIdent {
     /// Returns true if the FeedIdent matches the corresponding feed data.
-    pub fn matches_feed(&self, feed: &FeedInfo) -> bool {
+    pub fn matches_feed(&self, feed: &Feed) -> bool {
         match self {
             FeedIdent::Name(name) => *name == feed.name,
             FeedIdent::ID(id) => *id == feed.id,
             FeedIdent::County(c) => *c == feed.county,
-            FeedIdent::State(id) => match feed.location {
-                Location::FromTop50(loc_id, _) | Location::FromState(loc_id) => *id == loc_id,
-            },
+            FeedIdent::State(id) => *id == feed.location.id,
         }
     }
 }

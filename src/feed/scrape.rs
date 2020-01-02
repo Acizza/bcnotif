@@ -1,10 +1,10 @@
 use crate::err::ScrapeError;
-use crate::feed::{FeedInfo, Location};
+use crate::feed::{Feed, Location};
 use smallvec::SmallVec;
 
 type Result<T> = std::result::Result<T, ScrapeError>;
 
-pub fn scrape_top<S>(body: S) -> Result<Vec<FeedInfo>>
+pub fn scrape_top<S>(body: S) -> Result<Vec<Feed>>
 where
     S: AsRef<str>,
 {
@@ -36,7 +36,7 @@ where
             }
 
             let state_info = Link::parse(&links[1])?;
-            let location = Location::FromTop50(state_info.href_id, state_info.value.to_string());
+            let location = Location::with_state(state_info.href_id, state_info.value);
 
             let county = if links.len() > 2 {
                 parse_tag_body(&links[2])?.to_string()
@@ -54,7 +54,7 @@ where
             Some(body.to_string())
         });
 
-        let feed = FeedInfo {
+        let feed = Feed {
             id: id_name_link.href_id,
             name: id_name_link.value.into(),
             listeners,
@@ -73,7 +73,7 @@ where
     Ok(feeds)
 }
 
-pub fn scrape_state<S>(state_id: u32, body: S) -> Result<Vec<FeedInfo>>
+pub fn scrape_state<S>(state_id: u32, body: S) -> Result<Vec<Feed>>
 where
     S: AsRef<str>,
 {
@@ -107,11 +107,11 @@ where
                 element: "listeners",
             })?;
 
-        let feed = FeedInfo {
+        let feed = Feed {
             id: id_name_link.href_id,
             name: id_name_link.value.into(),
             listeners,
-            location: Location::FromState(state_id),
+            location: Location::new(state_id),
             county: county.into(),
             alert,
         };

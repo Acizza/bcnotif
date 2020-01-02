@@ -11,17 +11,16 @@ use reqwest::blocking::Client;
 use snafu::{OptionExt, ResultExt};
 use stats::ListenerStats;
 use std::borrow::Cow;
+use std::cmp::{self, Eq, Ord};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::mem;
 use std::path::PathBuf;
 
-type FeedID = u32;
-
 #[derive(Debug)]
-pub struct FeedInfo {
-    pub id: FeedID,
+pub struct Feed {
+    pub id: u32,
     pub name: String,
     pub listeners: u32,
     pub location: Location,
@@ -29,58 +28,87 @@ pub struct FeedInfo {
     pub alert: Option<String>,
 }
 
-impl FeedInfo {
-    pub fn scrape_from_source(source: FeedSource) -> Result<Vec<FeedInfo>> {
+impl Feed {
+    fn scrape_all_source(source: Source) -> Result<Vec<Self>> {
         static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
-        let body = CLIENT.get(source.as_url_str().as_ref()).send()?.text()?;
+        let body = CLIENT.get(source.url().as_ref()).send()?.text()?;
 
         match source {
-            FeedSource::Top50 => scrape::scrape_top(&body).context(err::ParseTopFeeds),
-            FeedSource::State(id) => scrape::scrape_state(id, &body).context(err::ParseStateFeeds),
+            Source::Top50 => scrape::scrape_top(&body).context(err::ParseTopFeeds),
+            Source::State(id) => scrape::scrape_state(id, &body).context(err::ParseStateFeeds),
         }
     }
 
-    pub fn scrape_from_config(config: &Config) -> Result<Vec<FeedInfo>> {
-        let mut feeds = FeedInfo::scrape_from_source(FeedSource::Top50)?;
+    pub fn scrape_all(config: &Config) -> Result<Vec<Self>> {
+        let mut feeds = Self::scrape_all_source(Source::Top50)?;
 
         if let Some(state_id) = config.misc.state_feeds_id {
-            let state_feeds = FeedInfo::scrape_from_source(FeedSource::State(state_id))?;
-            feeds.reserve(state_feeds.len());
+            let state_feeds = Self::scrape_all_source(Source::State(state_id))?;
             feeds.extend(state_feeds);
         }
 
-        feeds.sort_unstable_by_key(|feed| feed.id);
+        feeds.sort_unstable();
         feeds.dedup();
 
         Ok(feeds)
     }
 }
 
-impl PartialEq for FeedInfo {
-    fn eq(&self, other: &FeedInfo) -> bool {
+impl PartialEq for Feed {
+    fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
+impl Eq for Feed {}
+
+impl PartialOrd for Feed {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Feed {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
 #[derive(Debug)]
-pub enum Location {
-    FromTop50(u32, String),
-    FromState(u32),
+pub struct Location {
+    pub id: u32,
+    pub state: Option<String>,
 }
 
-pub enum FeedSource {
+impl Location {
+    pub fn with_state<S>(id: u32, state: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            id,
+            state: Some(state.into()),
+        }
+    }
+
+    pub fn new(id: u32) -> Self {
+        Self { id, state: None }
+    }
+}
+
+pub type StateID = u32;
+
+pub enum Source {
     Top50,
-    State(u32),
+    State(StateID),
 }
 
-impl FeedSource {
-    pub fn as_url_str(&self) -> Cow<str> {
+impl Source {
+    pub fn url(&self) -> Cow<str> {
         match self {
-            FeedSource::Top50 => Cow::Borrowed("https://www.broadcastify.com/listen/top"),
-            FeedSource::State(id) => {
-                format!("https://www.broadcastify.com/listen/stid/{}", id).into()
-            }
+            Self::Top50 => "https://www.broadcastify.com/listen/top".into(),
+            Self::State(id) => format!("https://www.broadcastify.com/listen/stid/{}", id).into(),
         }
     }
 }
@@ -88,7 +116,7 @@ impl FeedSource {
 #[derive(Debug)]
 pub struct FeedData {
     pub path: PathBuf,
-    pub stats: HashMap<FeedID, ListenerStats>,
+    pub stats: HashMap<u32, ListenerStats>,
 }
 
 impl FeedData {
@@ -176,18 +204,18 @@ impl FeedData {
 
 #[derive(Debug)]
 pub struct FeedDisplay {
-    pub info: FeedInfo,
+    pub feed: Feed,
     pub jump: f32,
     pub spike_count: u32,
     pub has_spiked: bool,
 }
 
 impl FeedDisplay {
-    pub fn from(info: FeedInfo, stats: &ListenerStats) -> FeedDisplay {
-        let jump = stats.get_jump(info.listeners);
+    pub fn from(feed: Feed, stats: &ListenerStats) -> FeedDisplay {
+        let jump = stats.get_jump(feed.listeners);
 
         FeedDisplay {
-            info,
+            feed,
             jump,
             spike_count: stats.spike_count,
             has_spiked: stats.has_spiked,
@@ -196,27 +224,25 @@ impl FeedDisplay {
 
     pub fn show_notif(&self, index: u32, max_index: u32) -> Result<()> {
         let title = format!(
-            "{} update {} of {}",
-            env!("CARGO_PKG_NAME"),
-            index,
-            max_index
+            concat!(env!("CARGO_PKG_NAME"), " update {} of {}"),
+            index, max_index
         );
 
-        let alert = match &self.info.alert {
+        let alert = match &self.feed.alert {
             Some(alert) => Cow::Owned(format!("\nalert: {}", alert)),
             None => Cow::Borrowed(""),
         };
 
-        let state = match &self.info.location {
-            Location::FromTop50(_, name) => name.as_ref(),
-            Location::FromState(_) => "CS",
+        let state = match &self.feed.location.state {
+            Some(state) => state,
+            None => "CS",
         };
 
         let body = format!(
             "{state} | {name}\n{listeners} (^{jump}){alert}",
             state = state,
-            name = self.info.name,
-            listeners = self.info.listeners,
+            name = self.feed.name,
+            listeners = self.feed.listeners,
             jump = self.jump as i32,
             alert = &alert,
         );
@@ -231,7 +257,7 @@ impl FeedDisplay {
     }
 }
 
-pub fn should_be_displayed(feed: &FeedInfo, stats: &ListenerStats, config: &Config) -> bool {
+pub fn should_be_displayed(feed: &Feed, stats: &ListenerStats, config: &Config) -> bool {
     if let Some(max_times) = config.misc.max_times_to_show_feed {
         if stats.spike_count > max_times {
             return false;

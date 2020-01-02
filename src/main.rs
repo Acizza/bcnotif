@@ -4,7 +4,7 @@ mod feed;
 mod path;
 
 use crate::feed::stats::ListenerStats;
-use crate::feed::{FeedData, FeedDisplay, FeedInfo};
+use crate::feed::{Feed, FeedData, FeedDisplay};
 use chrono::{Timelike, Utc};
 use clap::{clap_app, ArgMatches};
 use config::Config;
@@ -61,7 +61,7 @@ fn run(args: clap::ArgMatches) -> Result<()> {
 
 fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> Result<()> {
     let feed_info = {
-        let mut feeds = FeedInfo::scrape_from_config(config)?;
+        let mut feeds = Feed::scrape_all(config)?;
         filter_feeds(config, &mut feeds);
         feeds
     };
@@ -102,7 +102,7 @@ fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> R
     Ok(())
 }
 
-fn filter_feeds(config: &Config, feeds: &mut Vec<FeedInfo>) {
+fn filter_feeds(config: &Config, feeds: &mut Vec<Feed>) {
     if !config.whitelist.is_empty() {
         feeds.retain(|feed| {
             config
@@ -132,7 +132,7 @@ fn sort_feeds(feeds: &mut [FeedDisplay], config: &Config) {
         };
 
         match config.sorting.sort_type {
-            SortType::Listeners => x.info.listeners.cmp(&y.info.listeners),
+            SortType::Listeners => x.feed.listeners.cmp(&y.feed.listeners),
             SortType::Jump => {
                 let x_jump = x.jump as i32;
                 let y_jump = y.jump as i32;
