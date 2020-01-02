@@ -3,11 +3,12 @@ pub mod stats;
 mod scrape;
 
 use crate::config::Config;
-use crate::error::FeedError;
+use crate::err::{self, Result};
 use crate::path;
 use notify_rust::Notification;
 use once_cell::sync::Lazy;
 use reqwest::blocking::Client;
+use snafu::{OptionExt, ResultExt};
 use stats::ListenerStats;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -29,20 +30,18 @@ pub struct FeedInfo {
 }
 
 impl FeedInfo {
-    pub fn scrape_from_source(source: FeedSource) -> Result<Vec<FeedInfo>, FeedError> {
+    pub fn scrape_from_source(source: FeedSource) -> Result<Vec<FeedInfo>> {
         static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
         let body = CLIENT.get(source.as_url_str().as_ref()).send()?.text()?;
 
         match source {
-            FeedSource::Top50 => scrape::scrape_top(&body).map_err(FeedError::ParseTopFeeds),
-            FeedSource::State(id) => {
-                scrape::scrape_state(id, &body).map_err(|err| FeedError::ParseStateFeeds(err, id))
-            }
+            FeedSource::Top50 => scrape::scrape_top(&body).context(err::ParseTopFeeds),
+            FeedSource::State(id) => scrape::scrape_state(id, &body).context(err::ParseStateFeeds),
         }
     }
 
-    pub fn scrape_from_config(config: &Config) -> Result<Vec<FeedInfo>, FeedError> {
+    pub fn scrape_from_config(config: &Config) -> Result<Vec<FeedInfo>> {
         let mut feeds = FeedInfo::scrape_from_source(FeedSource::Top50)?;
 
         if let Some(state_id) = config.misc.state_feeds_id {
@@ -105,12 +104,12 @@ impl FeedData {
         }
     }
 
-    pub fn default_path() -> Result<PathBuf, FeedError> {
+    pub fn default_path() -> Result<PathBuf> {
         let path = path::get_data_file(FeedData::DEFAULT_FNAME)?;
         Ok(path)
     }
 
-    pub fn load<P>(path: P) -> Result<FeedData, FeedError>
+    pub fn load<P>(path: P) -> Result<FeedData>
     where
         P: Into<PathBuf>,
     {
@@ -123,16 +122,16 @@ impl FeedData {
             let split = line.split(',').collect::<Vec<&str>>();
 
             if split.len() != 1 + stats::NUM_HOURLY_STATS {
-                return Err(FeedError::MalformedCSV);
+                return Err(err::Error::MalformedCSV);
             }
 
-            let id = split[0].parse().map_err(|_| FeedError::MalformedCSV)?;
+            let id = split[0].parse().ok().context(err::MalformedCSV)?;
 
             let average_hourly = unsafe {
                 let mut arr: [f32; stats::NUM_HOURLY_STATS] = mem::uninitialized();
 
                 for (i, val) in split[1..=stats::NUM_HOURLY_STATS].iter().enumerate() {
-                    arr[i] = val.parse().map_err(|_| FeedError::MalformedCSV)?;
+                    arr[i] = val.parse().ok().context(err::MalformedCSV)?;
                 }
 
                 arr
@@ -146,7 +145,7 @@ impl FeedData {
         Ok(feed_data)
     }
 
-    pub fn save(&self) -> Result<(), FeedError> {
+    pub fn save(&self) -> Result<()> {
         let mut buffer = String::new();
 
         for (id, stats) in &self.stats {
@@ -194,7 +193,7 @@ impl FeedDisplay {
         }
     }
 
-    pub fn show_notif(&self, index: u32, max_index: u32) -> Result<(), FeedError> {
+    pub fn show_notif(&self, index: u32, max_index: u32) -> Result<()> {
         let title = format!(
             "{} update {} of {}",
             env!("CARGO_PKG_NAME"),
@@ -225,7 +224,7 @@ impl FeedDisplay {
             .summary(&title)
             .body(&body)
             .show()
-            .map_err(|_| FeedError::FailedToCreateNotification)?;
+            .context(err::CreateNotif)?;
 
         Ok(())
     }

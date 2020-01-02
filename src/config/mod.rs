@@ -1,7 +1,7 @@
 #[macro_use]
 mod generation;
 
-use crate::error::ConfigError;
+use crate::err::Result;
 use crate::feed::{FeedInfo, Location};
 use crate::path;
 use chrono::{Datelike, Local};
@@ -30,7 +30,7 @@ macro_rules! gen_base_config {
         }
 
         impl $name {
-            pub fn from_file(path: &Path) -> Result<$name, crate::error::ConfigError> {
+            pub fn from_file(path: &Path) -> Result<$name> {
                 let file = ::std::fs::read_to_string(path)?;
 
                 if file.len() == 0 {
@@ -60,7 +60,7 @@ gen_base_config!(Config,
 );
 
 impl Config {
-    pub fn load() -> Result<Config, ConfigError> {
+    pub fn load() -> Result<Config> {
         let path = path::get_config_file(DEFAULT_CONFIG_NAME)?;
 
         if path.exists() {

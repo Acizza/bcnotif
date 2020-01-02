@@ -1,5 +1,5 @@
 mod config;
-mod error;
+mod err;
 mod feed;
 mod path;
 
@@ -8,8 +8,7 @@ use crate::feed::{FeedData, FeedDisplay, FeedInfo};
 use chrono::{Timelike, Utc};
 use clap::{clap_app, ArgMatches};
 use config::Config;
-use error::Error;
-use notify_rust::Notification;
+use err::Result;
 use smallvec::SmallVec;
 use std::time::Duration;
 
@@ -25,13 +24,13 @@ fn main() {
     match run(args) {
         Ok(_) => (),
         Err(err) => {
-            display_error(err);
+            err::display_error(err);
             std::process::exit(1);
         }
     }
 }
 
-fn run(args: clap::ArgMatches) -> Result<(), Error> {
+fn run(args: clap::ArgMatches) -> Result<()> {
     let mut config = Config::load()?;
 
     let mut feed_data = {
@@ -53,39 +52,14 @@ fn run(args: clap::ArgMatches) -> Result<(), Error> {
 
         match run_update(&mut feed_data, &args, &config) {
             Ok(_) => (),
-            Err(err) => display_error(err),
+            Err(err) => err::display_error(err),
         }
 
         std::thread::sleep(Duration::from_secs((config.misc.update_time * 60.0) as u64));
     }
 }
 
-fn display_error<E>(err: E)
-where
-    E: Into<failure::Error>,
-{
-    let err = err.into();
-
-    eprintln!("error: {}", err);
-
-    for cause in err.iter_chain().skip(1) {
-        eprintln!("  cause: {}", cause);
-    }
-
-    let backtrace = err.backtrace().to_string();
-
-    if !backtrace.is_empty() {
-        eprintln!("{}", backtrace);
-    }
-
-    Notification::new()
-        .summary(concat!(env!("CARGO_PKG_NAME"), " error"))
-        .body(&err.to_string())
-        .show()
-        .ok();
-}
-
-fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> Result<(), Error> {
+fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> Result<()> {
     let feed_info = {
         let mut feeds = FeedInfo::scrape_from_config(config)?;
         filter_feeds(config, &mut feeds);
@@ -169,7 +143,7 @@ fn sort_feeds(feeds: &mut [FeedDisplay], config: &Config) {
     });
 }
 
-fn show_feeds(feeds: &[FeedDisplay]) -> Result<(), Error> {
+fn show_feeds(feeds: &[FeedDisplay]) -> Result<()> {
     let total_feeds = feeds.len() as u32;
 
     for (i, feed) in feeds.iter().enumerate() {
