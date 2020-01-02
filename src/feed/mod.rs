@@ -4,7 +4,7 @@ mod scrape;
 
 use crate::config::Config;
 use crate::err::{self, Result};
-use crate::path;
+use crate::path::FilePath;
 use notify_rust::Notification;
 use once_cell::sync::Lazy;
 use reqwest::blocking::Client;
@@ -105,7 +105,8 @@ impl FeedData {
     }
 
     pub fn default_path() -> Result<PathBuf> {
-        let path = path::get_data_file(FeedData::DEFAULT_FNAME)?;
+        let mut path = FilePath::LocalData.validated_dir_path()?;
+        path.push(Self::DEFAULT_FNAME);
         Ok(path)
     }
 

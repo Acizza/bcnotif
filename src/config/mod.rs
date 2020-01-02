@@ -3,7 +3,7 @@ mod generation;
 
 use crate::err::Result;
 use crate::feed::{FeedInfo, Location};
-use crate::path;
+use crate::path::FilePath;
 use chrono::{Datelike, Local};
 use std::path::Path;
 use yaml_rust::{Yaml, YamlLoader};
@@ -61,7 +61,8 @@ gen_base_config!(Config,
 
 impl Config {
     pub fn load() -> Result<Config> {
-        let path = path::get_config_file(DEFAULT_CONFIG_NAME)?;
+        let mut path = FilePath::Config.validated_dir_path()?;
+        path.push(DEFAULT_CONFIG_NAME);
 
         if path.exists() {
             Config::from_file(&path)
