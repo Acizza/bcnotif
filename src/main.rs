@@ -70,10 +70,6 @@ fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> R
     let mut displayed = SmallVec::<[FeedDisplay; 3]>::new();
 
     for info in feed_info {
-        if info.listeners < config.misc.minimum_listeners {
-            continue;
-        }
-
         let stats = feed_data
             .stats
             .entry(info.id)

@@ -19,32 +19,23 @@ use std::mem;
 use std::path::PathBuf;
 
 #[derive(Debug)]
-pub struct Feed {
+pub struct Feed<'a> {
     pub id: u32,
     pub name: String,
     pub listeners: u32,
     pub location: Location,
-    pub county: String,
+    pub county: Cow<'a, str>,
     pub alert: Option<String>,
 }
 
-impl Feed {
-    fn scrape_all_source(source: Source) -> Result<Vec<Self>> {
-        static CLIENT: Lazy<Client> = Lazy::new(Client::new);
-
-        let body = CLIENT.get(source.url().as_ref()).send()?.text()?;
-
-        match source {
-            Source::Top50 => scrape::scrape_top(&body).context(err::ParseTopFeeds),
-            Source::State(id) => scrape::scrape_state(id, &body).context(err::ParseStateFeeds),
-        }
-    }
-
+impl<'a> Feed<'a> {
     pub fn scrape_all(config: &Config) -> Result<Vec<Self>> {
-        let mut feeds = Self::scrape_all_source(Source::Top50)?;
+        let mut feeds = Self::scrape_source(Source::Top50, config.misc.minimum_listeners)?;
 
         if let Some(state_id) = config.misc.state_feeds_id {
-            let state_feeds = Self::scrape_all_source(Source::State(state_id))?;
+            let state_feeds =
+                Self::scrape_source(Source::State(state_id), config.misc.minimum_listeners)?;
+
             feeds.extend(state_feeds);
         }
 
@@ -53,23 +44,36 @@ impl Feed {
 
         Ok(feeds)
     }
+
+    fn scrape_source(source: Source, min_listeners: u32) -> Result<Vec<Self>> {
+        static CLIENT: Lazy<Client> = Lazy::new(Client::new);
+
+        let body = CLIENT.get(source.url().as_ref()).send()?.text()?;
+
+        match source {
+            Source::Top50 => scrape::scrape_top(&body, min_listeners).context(err::ParseTopFeeds),
+            Source::State(id) => {
+                scrape::scrape_state(&body, min_listeners, id).context(err::ParseStateFeeds)
+            }
+        }
+    }
 }
 
-impl PartialEq for Feed {
+impl<'a> PartialEq for Feed<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl Eq for Feed {}
+impl<'a> Eq for Feed<'a> {}
 
-impl PartialOrd for Feed {
+impl<'a> PartialOrd for Feed<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Feed {
+impl<'a> Ord for Feed<'a> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.id.cmp(&other.id)
     }
@@ -77,23 +81,26 @@ impl Ord for Feed {
 
 #[derive(Debug)]
 pub struct Location {
-    pub id: u32,
-    pub state: Option<String>,
+    pub state_id: u32,
+    pub state_name: Option<String>,
 }
 
 impl Location {
-    pub fn with_state<S>(id: u32, state: S) -> Self
+    pub fn with_state<S>(state_id: u32, state_name: S) -> Self
     where
         S: Into<String>,
     {
         Self {
-            id,
-            state: Some(state.into()),
+            state_id,
+            state_name: Some(state_name.into()),
         }
     }
 
-    pub fn new(id: u32) -> Self {
-        Self { id, state: None }
+    pub fn new(state_id: u32) -> Self {
+        Self {
+            state_id,
+            state_name: None,
+        }
     }
 }
 
@@ -203,15 +210,15 @@ impl FeedData {
 }
 
 #[derive(Debug)]
-pub struct FeedDisplay {
-    pub feed: Feed,
+pub struct FeedDisplay<'a> {
+    pub feed: Feed<'a>,
     pub jump: f32,
     pub spike_count: u32,
     pub has_spiked: bool,
 }
 
-impl FeedDisplay {
-    pub fn from(feed: Feed, stats: &ListenerStats) -> FeedDisplay {
+impl<'a> FeedDisplay<'a> {
+    pub fn from(feed: Feed<'a>, stats: &ListenerStats) -> Self {
         let jump = stats.get_jump(feed.listeners);
 
         FeedDisplay {
@@ -233,7 +240,7 @@ impl FeedDisplay {
             None => Cow::Borrowed(""),
         };
 
-        let state = match &self.feed.location.state {
+        let state = match &self.feed.location.state_name {
             Some(state) => state,
             None => "CS",
         };

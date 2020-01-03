@@ -1,7 +1,6 @@
 use notify_rust::Notification;
 use snafu::{Backtrace, ErrorCompat, GenerateBacktrace, Snafu};
 use std::io;
-use std::num;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -69,23 +68,11 @@ impl From<yaml_rust::ScanError> for Error {
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum ScrapeError {
-    #[snafu(display("unable to parse {} information", element))]
-    FailedIntParse {
-        source: num::ParseIntError,
-        element: &'static str,
-    },
-
     #[snafu(display("no feeds found"))]
     NoFeeds,
 
-    #[snafu(display("search string not found: {}", string))]
-    SearchStringNotFound { string: String },
-
-    #[snafu(display("feed table has an invalid number of columns"))]
-    InvalidNumberOfColumns,
-
-    #[snafu(display("feed did not have location info"))]
-    NoLocationInfo,
+    #[snafu(display("missing feed table"))]
+    MissingFeedTable,
 }
 
 pub fn display_error(err: Error) {

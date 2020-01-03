@@ -116,7 +116,7 @@ impl FeedIdent {
             FeedIdent::Name(name) => *name == feed.name,
             FeedIdent::ID(id) => *id == feed.id,
             FeedIdent::County(c) => *c == feed.county,
-            FeedIdent::State(id) => *id == feed.location.id,
+            FeedIdent::State(id) => *id == feed.location.state_id,
         }
     }
 }
