@@ -3,10 +3,10 @@ mod err;
 mod feed;
 mod path;
 
-use crate::feed::stats::ListenerStats;
-use crate::feed::{Feed, FeedData, FeedDisplay};
+use crate::feed::stats::{ListenerStatMap, ListenerStats};
+use crate::feed::{Feed, FeedDisplay};
 use chrono::{Timelike, Utc};
-use clap::{clap_app, ArgMatches};
+use clap::clap_app;
 use config::Config;
 use err::Result;
 use smallvec::SmallVec;
@@ -32,25 +32,20 @@ fn main() {
 
 fn run(args: clap::ArgMatches) -> Result<()> {
     let mut config = Config::load()?;
-
-    let mut feed_data = {
-        let path = FeedData::default_path()?;
-
-        if path.exists() {
-            FeedData::load(path)?
-        } else {
-            FeedData::new(path)
-        }
-    };
+    let mut listener_stats = ListenerStatMap::load_or_new()?;
 
     let reload_config = args.is_present("RELOAD_CONFIG");
+    let save_data = !args.is_present("DONT_SAVE_DATA");
 
     loop {
         if reload_config {
-            config = Config::load()?;
+            match Config::load() {
+                Ok(new) => config = new,
+                Err(err) => err::display_error(err),
+            }
         }
 
-        match run_update(&mut feed_data, &args, &config) {
+        match run_update(&mut listener_stats, save_data, &config) {
             Ok(_) => (),
             Err(err) => err::display_error(err),
         }
@@ -59,7 +54,11 @@ fn run(args: clap::ArgMatches) -> Result<()> {
     }
 }
 
-fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> Result<()> {
+fn run_update(
+    listener_stats: &mut ListenerStatMap,
+    save_data: bool,
+    config: &Config,
+) -> Result<()> {
     let feed_info = {
         let mut feeds = Feed::scrape_all(config)?;
         filter_feeds(config, &mut feeds);
@@ -70,8 +69,8 @@ fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> R
     let mut displayed = SmallVec::<[FeedDisplay; 3]>::new();
 
     for info in feed_info {
-        let stats = feed_data
-            .stats
+        let stats = listener_stats
+            .stats_mut()
             .entry(info.id)
             .or_insert_with(ListenerStats::new);
 
@@ -91,8 +90,8 @@ fn run_update(feed_data: &mut FeedData, args: &ArgMatches, config: &Config) -> R
     sort_feeds(&mut displayed, config);
     show_feeds(&displayed)?;
 
-    if !args.is_present("DONT_SAVE_DATA") {
-        feed_data.save()?;
+    if save_data {
+        listener_stats.save()?;
     }
 
     Ok(())

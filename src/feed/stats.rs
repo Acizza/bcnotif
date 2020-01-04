@@ -1,10 +1,13 @@
 use crate::config::Config;
+use crate::err::{self, Result};
 use crate::feed::Feed;
+use crate::path::FilePath;
 use smallvec::{smallvec, SmallVec};
-
-pub const NUM_HOURLY_STATS: usize = 24;
-
-pub type HourlyStats = [f32; NUM_HOURLY_STATS];
+use snafu::OptionExt;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 
 /// Represents an average set of data that wraps around its specified sample size.
 #[derive(Debug, Clone)]
@@ -62,6 +65,8 @@ impl Default for Average {
     }
 }
 
+pub type HourlyListeners = [f32; 24];
+
 /// Represents general statistical data for feeds.
 #[derive(Debug, Clone)]
 pub struct ListenerStats {
@@ -70,7 +75,7 @@ pub struct ListenerStats {
     /// Represents the average number of listeners before a consistent spike occured.
     pub unskewed_average: Option<f32>,
     /// Contains the average number of listeners for any given hour.
-    pub average_hourly: HourlyStats,
+    pub average_hourly: HourlyListeners,
     /// Indicates whether or not the listner count has spiked since the last update.
     pub has_spiked: bool,
     /// Represents the number of times the feed has spiked consecutively.
@@ -78,13 +83,13 @@ pub struct ListenerStats {
 }
 
 impl ListenerStats {
-    pub fn new() -> ListenerStats {
-        ListenerStats::with_hourly([0.0; NUM_HOURLY_STATS])
+    pub fn new() -> Self {
+        Self::with_hourly([0.0; 24])
     }
 
-    /// Creates a new ListenerStats struct with existing hourly data.
-    pub fn with_hourly(hourly: HourlyStats) -> ListenerStats {
-        ListenerStats {
+    /// Create a new `ListenerStats` struct with existing hourly data.
+    pub fn with_hourly(hourly: HourlyListeners) -> Self {
+        Self {
             average: Average::default(),
             unskewed_average: None,
             average_hourly: hourly,
@@ -178,4 +183,88 @@ impl ListenerStats {
 
 fn lerp(v0: f32, v1: f32, t: f32) -> f32 {
     (1. - t) * v0 + t * v1
+}
+
+#[derive(Debug)]
+pub struct ListenerStatMap(HashMap<u32, ListenerStats>);
+
+impl ListenerStatMap {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn validated_path() -> Result<PathBuf> {
+        let mut path = FilePath::LocalData.validated_dir_path()?;
+        path.push("averages.csv");
+        Ok(path)
+    }
+
+    pub fn load_or_new() -> Result<Self> {
+        match Self::load() {
+            Ok(stats) => Ok(stats),
+            Err(err) if err.is_file_nonexistant() => Ok(Self::new()),
+            err => err,
+        }
+    }
+
+    pub fn load() -> Result<Self> {
+        let path = Self::validated_path()?;
+        let reader = BufReader::new(File::open(&path)?);
+        let mut stats = HashMap::with_capacity(1000);
+
+        for line in reader.lines() {
+            let line = line?;
+            let mut columns = line.split(',');
+
+            let id = columns
+                .next()
+                .and_then(|column| column.parse().ok())
+                .context(err::MalformedCSV)?;
+
+            let average_hourly = {
+                let mut arr: HourlyListeners = [0.0; 24];
+
+                for avg in &mut arr {
+                    *avg = columns
+                        .next()
+                        .and_then(|column| column.parse().ok())
+                        .context(err::MalformedCSV)?;
+                }
+
+                arr
+            };
+
+            let stat = ListenerStats::with_hourly(average_hourly);
+            stats.insert(id, stat);
+        }
+
+        Ok(Self(stats))
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let mut buffer = String::new();
+
+        for (id, stats) in self.stats() {
+            buffer.push_str(&format!("{}", id));
+
+            for &avg in &stats.average_hourly {
+                buffer.push_str(&format!(",{}", avg as i32));
+            }
+
+            buffer.push('\n');
+        }
+
+        let path = Self::validated_path()?;
+        std::fs::write(path, buffer).map_err(Into::into)
+    }
+
+    #[inline(always)]
+    pub fn stats(&self) -> &HashMap<u32, ListenerStats> {
+        &self.0
+    }
+
+    #[inline(always)]
+    pub fn stats_mut(&mut self) -> &mut HashMap<u32, ListenerStats> {
+        &mut self.0
+    }
 }

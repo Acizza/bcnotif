@@ -38,6 +38,15 @@ pub enum Error {
     MalformedCSV,
 }
 
+impl Error {
+    pub fn is_file_nonexistant(&self) -> bool {
+        match self {
+            Error::IO { source, .. } => source.kind() == io::ErrorKind::NotFound,
+            _ => false,
+        }
+    }
+}
+
 impl From<io::Error> for Error {
     fn from(source: io::Error) -> Self {
         Self::IO {

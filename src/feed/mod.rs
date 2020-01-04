@@ -4,19 +4,13 @@ mod scrape;
 
 use crate::config::Config;
 use crate::err::{self, Result};
-use crate::path::FilePath;
 use notify_rust::Notification;
 use once_cell::sync::Lazy;
 use reqwest::blocking::Client;
-use snafu::{OptionExt, ResultExt};
+use snafu::ResultExt;
 use stats::ListenerStats;
 use std::borrow::Cow;
 use std::cmp::{self, Eq, Ord};
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::mem;
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Feed<'a> {
@@ -117,95 +111,6 @@ impl Source {
             Self::Top50 => "https://www.broadcastify.com/listen/top".into(),
             Self::State(id) => format!("https://www.broadcastify.com/listen/stid/{}", id).into(),
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct FeedData {
-    pub path: PathBuf,
-    pub stats: HashMap<u32, ListenerStats>,
-}
-
-impl FeedData {
-    pub const DEFAULT_FNAME: &'static str = "averages.csv";
-
-    pub fn new<P>(path: P) -> FeedData
-    where
-        P: Into<PathBuf>,
-    {
-        FeedData {
-            path: path.into(),
-            stats: HashMap::new(),
-        }
-    }
-
-    pub fn default_path() -> Result<PathBuf> {
-        let mut path = FilePath::LocalData.validated_dir_path()?;
-        path.push(Self::DEFAULT_FNAME);
-        Ok(path)
-    }
-
-    pub fn load<P>(path: P) -> Result<FeedData>
-    where
-        P: Into<PathBuf>,
-    {
-        let path = path.into();
-        let reader = BufReader::new(File::open(&path)?);
-        let mut stats = HashMap::with_capacity(1000);
-
-        for line in reader.lines() {
-            let line = line?;
-            let split = line.split(',').collect::<Vec<&str>>();
-
-            if split.len() != 1 + stats::NUM_HOURLY_STATS {
-                return Err(err::Error::MalformedCSV);
-            }
-
-            let id = split[0].parse().ok().context(err::MalformedCSV)?;
-
-            let average_hourly = unsafe {
-                let mut arr: [f32; stats::NUM_HOURLY_STATS] = mem::uninitialized();
-
-                for (i, val) in split[1..=stats::NUM_HOURLY_STATS].iter().enumerate() {
-                    arr[i] = val.parse().ok().context(err::MalformedCSV)?;
-                }
-
-                arr
-            };
-
-            let stat = ListenerStats::with_hourly(average_hourly);
-            stats.insert(id, stat);
-        }
-
-        let feed_data = FeedData { path, stats };
-        Ok(feed_data)
-    }
-
-    pub fn save(&self) -> Result<()> {
-        let mut buffer = String::new();
-
-        for (id, stats) in &self.stats {
-            {
-                let id = id.to_string();
-                buffer.reserve(id.len() + 1);
-                buffer.push_str(&id);
-            }
-
-            let hourly = stats.average_hourly;
-
-            for stat in &hourly {
-                let stat = (*stat as i32).to_string();
-                buffer.reserve(stat.len() + 1);
-                buffer.push(',');
-                buffer.push_str(&stat);
-            }
-
-            buffer.push('\n');
-        }
-
-        std::fs::write(&self.path, buffer)?;
-
-        Ok(())
     }
 }
 
