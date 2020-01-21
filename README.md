@@ -1,13 +1,31 @@
 # bcnotif
 
+[![dependency status](https://deps.rs/repo/github/acizza/bcnotif/status.svg)](https://deps.rs/repo/github/acizza/bcnotif)
+
 This is a Linux program to find audio feeds on Broadcastify that suddenly jump in listeners (or have an alert) and display a desktop notification for them, as a sudden jump in listeners usually means that some kind of event or emergency is happening. Since some people tune into feeds as soon as they see / hear an incident occuring, you can usually get notified of large incidents (such as mass shootings) faster than you would following the news.
 
+# Building
+
+This project requires the following dependencies:
+
+* A recent stable version of Rust
+* SQLite
+* pkg-config
+* OpenSSL
+
+Note that pkg-config and OpenSSL are most likely already installed. If your distribution does not provide a recent version of Rust, you can obtain the latest version [here](https://rustup.rs/).
+
+Once the dependencies are installed, you can build the project simply by running `cargo build --release` in the project's directory. Once compilation is complete, you will find the `bcnotif` binary in the `target/release/` folder. None of the other files in that directory need to be kept.
+
 # Usage
-This program runs in the background and uses a default configuration that should be suitable for most uses, so it can be launched directly without having to configure anything.
+
+This program runs in the background, so it can be launched and forgotten about. Note that if you plan on configuring things, you will either have to kill & relaunch the program after saving changes or launch the program initially with the `-r` flag.
 
 # Configuration
-You can configure the application in many ways by creating a `config.yaml` file in the application directory.
-Configuration options include adding a state to monitor, changing the update time, changing the order feeds are displayed in, and using different spike values (which determine if a feed has suddenly jumped in listeners) for different days of the week, or for a certain feed ID, state, county, or feed name.
+
+To configure the program, first create or open the file at `~/.config/bcnotif/config.yaml`.
+
+Current configuration options include adding a state to monitor, changing the update time, changing the order feeds are displayed in, and using different spike values (which determine if a feed has suddenly jumped in listeners) for different days of the week, or for a certain feed ID, state, county, or feed name.
 
 For example, to process a certain state's feeds during an update (in addition to the top 50), you can add this to the config file:
 ```yaml
@@ -159,5 +177,3 @@ Unskewed Average:
   # How much (as a multiplier) the current listeners of a feed need to be above the saved average to set the unskewed average immediately
   Jump Required To Set: 4.0
 ```
-
-By default, the configuration file is only read once when the program is launched. To have it be read on every update, you can launch the program with the `--alwaysloadconfig` flag.
