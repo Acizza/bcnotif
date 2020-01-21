@@ -1,13 +1,11 @@
 use crate::config::Config;
-use crate::err::{self, Result};
+use crate::database::listener_avgs;
+use crate::database::Database;
+use crate::err::Result;
 use crate::feed::Feed;
-use crate::path::FilePath;
-use smallvec::{smallvec, SmallVec};
-use snafu::OptionExt;
+use chrono::{NaiveDate, Utc};
+use diesel::prelude::*;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
 
 /// Represents an average set of data that wraps around its specified sample size.
 #[derive(Debug, Clone)]
@@ -17,7 +15,7 @@ pub struct Average {
     /// The current average before the last call to self.add_sample().
     pub last: f32,
     /// The raw data that is used to calculate the current and last average.
-    pub data: SmallVec<[i32; 5]>,
+    pub data: [i32; Self::SAMPLE_SIZE],
     /// The current data index.
     index: usize,
     /// This keeps track of how many samples have been added since the struct
@@ -27,13 +25,17 @@ pub struct Average {
 }
 
 impl Average {
-    pub const DEFAULT_SAMPLE_SIZE: usize = 5;
+    pub const SAMPLE_SIZE: usize = 5;
 
-    pub fn new(sample_size: usize) -> Average {
-        Average {
-            current: 0.0,
+    pub fn new() -> Self {
+        Self::with_sample(0.0)
+    }
+
+    pub fn with_sample(value: f32) -> Self {
+        Self {
+            current: value,
             last: 0.0,
-            data: smallvec![0; sample_size],
+            data: [0; Self::SAMPLE_SIZE],
             index: 0,
             populated: 0,
         }
@@ -61,11 +63,97 @@ impl Average {
 
 impl Default for Average {
     fn default() -> Self {
-        Average::new(Average::DEFAULT_SAMPLE_SIZE)
+        Self::new()
     }
 }
 
-pub type HourlyListeners = [f32; 24];
+#[derive(Queryable, Insertable, Debug)]
+pub struct ListenerAvg {
+    pub id: i32,
+    pub last_seen: NaiveDate,
+    pub utc_0: Option<i32>,
+    pub utc_4: Option<i32>,
+    pub utc_8: Option<i32>,
+    pub utc_12: Option<i32>,
+    pub utc_16: Option<i32>,
+    pub utc_20: Option<i32>,
+}
+
+impl ListenerAvg {
+    pub fn new(id: i32) -> Self {
+        Self {
+            id,
+            last_seen: Utc::now().naive_utc().date(),
+            utc_0: None,
+            utc_4: None,
+            utc_8: None,
+            utc_12: None,
+            utc_16: None,
+            utc_20: None,
+        }
+    }
+
+    pub fn load_all(db: &Database) -> Result<ListenerAvgMap> {
+        use crate::database::listener_avgs::dsl::*;
+
+        let results = listener_avgs
+            .load::<Self>(db.conn())?
+            .into_iter()
+            .map(|avg| (avg.id as u32, avg))
+            .collect();
+
+        Ok(results)
+    }
+
+    pub fn save_to_db(&self, db: &Database) -> diesel::QueryResult<usize> {
+        use crate::database::listener_avgs::dsl::*;
+
+        diesel::replace_into(listener_avgs)
+            .values(self)
+            .execute(db.conn())
+    }
+
+    pub fn for_hour(&self, hour: u32) -> Option<i32> {
+        if hour < 4 || hour > 23 {
+            self.utc_0
+        } else if hour < 8 {
+            self.utc_4
+        } else if hour < 12 {
+            self.utc_8
+        } else if hour < 16 {
+            self.utc_12
+        } else if hour < 20 {
+            self.utc_16
+        } else {
+            self.utc_20
+        }
+    }
+
+    pub fn set_hour(&mut self, hour: u32, value: i32) {
+        let avg = if hour < 4 || hour > 23 {
+            &mut self.utc_0
+        } else if hour < 8 {
+            &mut self.utc_4
+        } else if hour < 12 {
+            &mut self.utc_8
+        } else if hour < 16 {
+            &mut self.utc_12
+        } else if hour < 20 {
+            &mut self.utc_16
+        } else {
+            &mut self.utc_20
+        };
+
+        *avg = Some(value);
+        self.last_seen = Utc::now().naive_utc().date();
+    }
+
+    pub fn update_from_stats(&mut self, hour: u32, stats: &ListenerStats) {
+        self.set_hour(hour, stats.get_unskewed_avg() as i32);
+    }
+}
+
+pub type ListenerAvgMap = HashMap<u32, ListenerAvg>;
 
 /// Represents general statistical data for feeds.
 #[derive(Debug, Clone)]
@@ -74,8 +162,6 @@ pub struct ListenerStats {
     pub average: Average,
     /// Represents the average number of listeners before a consistent spike occured.
     pub unskewed_average: Option<f32>,
-    /// Contains the average number of listeners for any given hour.
-    pub average_hourly: HourlyListeners,
     /// Indicates whether or not the listner count has spiked since the last update.
     pub has_spiked: bool,
     /// Represents the number of times the feed has spiked consecutively.
@@ -83,23 +169,17 @@ pub struct ListenerStats {
 }
 
 impl ListenerStats {
-    pub fn new() -> Self {
-        Self::with_hourly([0.0; 24])
-    }
-
-    /// Create a new `ListenerStats` struct with existing hourly data.
-    pub fn with_hourly(hourly: HourlyListeners) -> Self {
+    pub fn new(listeners: u32) -> Self {
         Self {
-            average: Average::default(),
+            average: Average::with_sample(listeners as f32),
             unskewed_average: None,
-            average_hourly: hourly,
             has_spiked: false,
             spike_count: 0,
         }
     }
 
     /// Updates the listener data and determines if the feed has spiked
-    pub fn update(&mut self, hour: usize, feed: &Feed, config: &Config) {
+    pub fn update(&mut self, feed: &Feed, config: &Config) {
         self.has_spiked = self.is_spiking(feed, config);
 
         self.spike_count = if self.has_spiked {
@@ -110,7 +190,6 @@ impl ListenerStats {
 
         self.average.add_sample(feed.listeners as i32);
         self.update_unskewed_average(feed.listeners as f32, config);
-        self.average_hourly[hour] = self.get_unskewed_avg();
     }
 
     /// Returns true if the specified feed is currently spiking in listeners
@@ -179,92 +258,21 @@ impl ListenerStats {
     pub fn get_jump(&self, listeners: u32) -> f32 {
         listeners as f32 - self.get_unskewed_avg()
     }
+
+    pub fn should_display_feed(&self, feed: &Feed, config: &Config) -> bool {
+        if let Some(max_times) = config.misc.max_times_to_show_feed {
+            if self.spike_count > max_times {
+                return false;
+            }
+        }
+
+        let has_alert = feed.alert.is_some() && config.misc.show_alert_feeds;
+        self.has_spiked || has_alert
+    }
 }
+
+pub type ListenerStatMap = HashMap<u32, ListenerStats>;
 
 fn lerp(v0: f32, v1: f32, t: f32) -> f32 {
     (1. - t) * v0 + t * v1
-}
-
-#[derive(Debug)]
-pub struct ListenerStatMap(HashMap<u32, ListenerStats>);
-
-impl ListenerStatMap {
-    pub fn new() -> Self {
-        Self(HashMap::new())
-    }
-
-    pub fn validated_path() -> Result<PathBuf> {
-        let mut path = FilePath::LocalData.validated_dir_path()?;
-        path.push("averages.csv");
-        Ok(path)
-    }
-
-    pub fn load_or_new() -> Result<Self> {
-        match Self::load() {
-            Ok(stats) => Ok(stats),
-            Err(err) if err.is_file_nonexistant() => Ok(Self::new()),
-            err => err,
-        }
-    }
-
-    pub fn load() -> Result<Self> {
-        let path = Self::validated_path()?;
-        let reader = BufReader::new(File::open(&path)?);
-        let mut stats = HashMap::with_capacity(1000);
-
-        for line in reader.lines() {
-            let line = line?;
-            let mut columns = line.split(',');
-
-            let id = columns
-                .next()
-                .and_then(|column| column.parse().ok())
-                .context(err::MalformedCSV)?;
-
-            let average_hourly = {
-                let mut arr: HourlyListeners = [0.0; 24];
-
-                for avg in &mut arr {
-                    *avg = columns
-                        .next()
-                        .and_then(|column| column.parse().ok())
-                        .context(err::MalformedCSV)?;
-                }
-
-                arr
-            };
-
-            let stat = ListenerStats::with_hourly(average_hourly);
-            stats.insert(id, stat);
-        }
-
-        Ok(Self(stats))
-    }
-
-    pub fn save(&self) -> Result<()> {
-        let mut buffer = String::new();
-
-        for (id, stats) in self.stats() {
-            buffer.push_str(&format!("{}", id));
-
-            for &avg in &stats.average_hourly {
-                buffer.push_str(&format!(",{}", avg as i32));
-            }
-
-            buffer.push('\n');
-        }
-
-        let path = Self::validated_path()?;
-        std::fs::write(path, buffer).map_err(Into::into)
-    }
-
-    #[inline(always)]
-    pub fn stats(&self) -> &HashMap<u32, ListenerStats> {
-        &self.0
-    }
-
-    #[inline(always)]
-    pub fn stats_mut(&mut self) -> &mut HashMap<u32, ListenerStats> {
-        &mut self.0
-    }
 }

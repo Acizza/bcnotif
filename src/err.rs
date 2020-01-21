@@ -19,6 +19,24 @@ pub enum Error {
         backtrace: Backtrace,
     },
 
+    #[snafu(display("diesel error: {}", source))]
+    Diesel {
+        source: diesel::result::Error,
+        backtrace: Backtrace,
+    },
+
+    #[snafu(display("diesel connection error: {}", source))]
+    DieselConnection {
+        source: diesel::result::ConnectionError,
+        backtrace: Backtrace,
+    },
+
+    #[snafu(display("signal handler error: {}", source))]
+    CtrlC {
+        source: ctrlc::Error,
+        backtrace: Backtrace,
+    },
+
     #[snafu(display("YAML error: {}", source))]
     YAMLScan {
         source: yaml_rust::ScanError,
@@ -33,9 +51,6 @@ pub enum Error {
 
     #[snafu(display("failed to create notification: {}", source))]
     CreateNotif { source: notify_rust::Error },
-
-    #[snafu(display("malformed csv data"))]
-    MalformedCSV,
 }
 
 impl Error {
@@ -59,6 +74,33 @@ impl From<io::Error> for Error {
 impl From<reqwest::Error> for Error {
     fn from(source: reqwest::Error) -> Self {
         Self::Reqwest {
+            source,
+            backtrace: Backtrace::generate(),
+        }
+    }
+}
+
+impl From<diesel::result::Error> for Error {
+    fn from(source: diesel::result::Error) -> Self {
+        Self::Diesel {
+            source,
+            backtrace: Backtrace::generate(),
+        }
+    }
+}
+
+impl From<diesel::result::ConnectionError> for Error {
+    fn from(source: diesel::result::ConnectionError) -> Self {
+        Self::DieselConnection {
+            source,
+            backtrace: Backtrace::generate(),
+        }
+    }
+}
+
+impl From<ctrlc::Error> for Error {
+    fn from(source: ctrlc::Error) -> Self {
+        Self::CtrlC {
             source,
             backtrace: Backtrace::generate(),
         }

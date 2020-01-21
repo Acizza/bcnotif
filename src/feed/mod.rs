@@ -115,23 +115,15 @@ impl Source {
 }
 
 #[derive(Debug)]
-pub struct FeedDisplay<'a> {
+pub struct FeedNotif<'a> {
     pub feed: Feed<'a>,
     pub jump: f32,
-    pub spike_count: u32,
-    pub has_spiked: bool,
 }
 
-impl<'a> FeedDisplay<'a> {
-    pub fn from(feed: Feed<'a>, stats: &ListenerStats) -> Self {
+impl<'a> FeedNotif<'a> {
+    pub fn new(feed: Feed<'a>, stats: &ListenerStats) -> Self {
         let jump = stats.get_jump(feed.listeners);
-
-        FeedDisplay {
-            feed,
-            jump,
-            spike_count: stats.spike_count,
-            has_spiked: stats.has_spiked,
-        }
+        Self { feed, jump }
     }
 
     pub fn show_notif(&self, index: u32, max_index: u32) -> Result<()> {
@@ -140,14 +132,14 @@ impl<'a> FeedDisplay<'a> {
             index, max_index
         );
 
-        let alert = match &self.feed.alert {
-            Some(alert) => Cow::Owned(format!("\nalert: {}", alert)),
-            None => Cow::Borrowed(""),
-        };
-
         let state = match &self.feed.location.state_name {
             Some(state) => state,
             None => "CS",
+        };
+
+        let alert = match &self.feed.alert {
+            Some(alert) => Cow::Owned(format!("\nalert: {}", alert)),
+            None => Cow::Borrowed(""),
         };
 
         let body = format!(
@@ -156,26 +148,45 @@ impl<'a> FeedDisplay<'a> {
             name = self.feed.name,
             listeners = self.feed.listeners,
             jump = self.jump as i32,
-            alert = &alert,
+            alert = alert,
         );
 
         Notification::new()
             .summary(&title)
             .body(&body)
             .show()
-            .context(err::CreateNotif)?;
+            .context(err::CreateNotif)
+            .map(|_| ())
+    }
+
+    pub fn sort_all(notifs: &mut [Self], config: &Config) {
+        use crate::config::{SortOrder, SortType};
+
+        notifs.sort_unstable_by(|x, y| {
+            let (x, y) = match config.sorting.sort_order {
+                SortOrder::Ascending => (x, y),
+                SortOrder::Descending => (y, x),
+            };
+
+            match config.sorting.sort_type {
+                SortType::Listeners => x.feed.listeners.cmp(&y.feed.listeners),
+                SortType::Jump => {
+                    let x_jump = x.jump as i32;
+                    let y_jump = y.jump as i32;
+
+                    x_jump.cmp(&y_jump)
+                }
+            }
+        });
+    }
+
+    pub fn show_all(notifs: &[Self]) -> Result<()> {
+        let num_notifs = notifs.len() as u32;
+
+        for (i, notif) in notifs.iter().enumerate() {
+            notif.show_notif(1 + i as u32, num_notifs)?;
+        }
 
         Ok(())
     }
-}
-
-pub fn should_be_displayed(feed: &Feed, stats: &ListenerStats, config: &Config) -> bool {
-    if let Some(max_times) = config.misc.max_times_to_show_feed {
-        if stats.spike_count > max_times {
-            return false;
-        }
-    }
-
-    let has_alert = feed.alert.is_some() && config.misc.show_alert_feeds;
-    stats.has_spiked || has_alert
 }
