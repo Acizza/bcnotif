@@ -149,7 +149,7 @@ impl ListenerAvg {
     }
 
     pub fn update_from_stats(&mut self, hour: u32, stats: &ListenerStats) {
-        self.set_hour(hour, stats.get_unskewed_avg() as i32);
+        self.set_hour(hour, stats.current_listener_average() as i32);
     }
 }
 
@@ -162,6 +162,8 @@ pub struct ListenerStats {
     pub average: Average,
     /// Represents the average number of listeners before a consistent spike occured.
     pub unskewed_average: Option<f32>,
+    /// The number of listeners the feed has jumped by since the last update.
+    pub jump: f32,
     /// Indicates whether or not the listner count has spiked since the last update.
     pub has_spiked: bool,
     /// Represents the number of times the feed has spiked consecutively.
@@ -173,6 +175,7 @@ impl ListenerStats {
         Self {
             average: Average::with_sample(listeners as f32),
             unskewed_average: None,
+            jump: 0.0,
             has_spiked: false,
             spike_count: 0,
         }
@@ -180,6 +183,7 @@ impl ListenerStats {
 
     /// Updates the listener data and determines if the feed has spiked
     pub fn update(&mut self, feed: &Feed, config: &Config) {
+        self.jump = feed.listeners as f32 - self.current_listener_average();
         self.has_spiked = self.is_spiking(feed, config);
 
         self.spike_count = if self.has_spiked {
@@ -199,20 +203,20 @@ impl ListenerStats {
             return false;
         }
 
-        let spike = config.get_feed_spike(feed);
+        let spike_cfg = config.get_feed_spike(feed);
         let listeners = feed.listeners as f32;
 
         // If a feed has a low number of listeners, use a higher threshold to
         // make the calculation less sensitive to very small listener jumps
         let threshold = if listeners < 50.0 {
-            spike.jump + (50.0 - listeners) * spike.low_listener_increase
+            spike_cfg.jump + (50.0 - listeners) * spike_cfg.low_listener_increase
         } else {
             // Otherwise, use a lower threshold based off of how fast the feed's
             // listeners are rising to encourage more updates during large incidents
-            let delta = self.get_jump(feed.listeners);
-            let rise_amount = delta / spike.high_listener_dec_every * spike.high_listener_dec;
+            let rise_amount =
+                self.jump / spike_cfg.high_listener_dec_every * spike_cfg.high_listener_dec;
 
-            spike.jump - rise_amount.min(spike.jump - 0.01)
+            spike_cfg.jump - rise_amount.min(spike_cfg.jump - 0.01)
         };
 
         listeners - self.average.current >= listeners * threshold
@@ -249,14 +253,11 @@ impl ListenerStats {
         }
     }
 
-    /// Returns the unskewed average if it is set, or the current average otherwise.
-    pub fn get_unskewed_avg(&self) -> f32 {
+    /// Returns a listener average that is resiliant to large sudden jumps.
+    ///
+    /// This is useful for preserving the integrity of the listener average over time.
+    pub fn current_listener_average(&self) -> f32 {
         self.unskewed_average.unwrap_or(self.average.current)
-    }
-
-    /// Returns the difference in listeners from the unskewed average.
-    pub fn get_jump(&self, listeners: u32) -> f32 {
-        listeners as f32 - self.get_unskewed_avg()
     }
 
     pub fn should_display_feed(&self, feed: &Feed, config: &Config) -> bool {

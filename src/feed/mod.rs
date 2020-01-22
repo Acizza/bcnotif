@@ -122,8 +122,10 @@ pub struct FeedNotif<'a> {
 
 impl<'a> FeedNotif<'a> {
     pub fn new(feed: Feed<'a>, stats: &ListenerStats) -> Self {
-        let jump = stats.get_jump(feed.listeners);
-        Self { feed, jump }
+        Self {
+            feed,
+            jump: stats.jump,
+        }
     }
 
     pub fn show_notif(&self, index: u32, max_index: u32) -> Result<()> {
