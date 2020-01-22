@@ -44,7 +44,7 @@ fn run(args: clap::ArgMatches) -> Result<()> {
 
     init_signal_handler(&db)?;
 
-    let mut listener_avgs = ListenerAvg::load_all(&db)?;
+    let mut listener_avgs = ListenerAvgMap::with_capacity(200);
     let mut listener_stats = ListenerStatMap::with_capacity(200);
 
     let reload_config = args.is_present("RELOAD_CONFIG");
@@ -93,7 +93,7 @@ fn run_update<'a>(
         for feed in feeds {
             let avg = listener_avgs
                 .entry(feed.id)
-                .or_insert_with(|| ListenerAvg::new(feed.id as i32));
+                .or_insert_with(|| ListenerAvg::load_or_new(db, feed.id as i32));
 
             let stats = listener_stats.entry(feed.id).or_insert_with(|| {
                 let listeners = avg.for_hour(hour).unwrap_or(feed.listeners as i32);

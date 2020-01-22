@@ -93,16 +93,17 @@ impl ListenerAvg {
         }
     }
 
-    pub fn load_all(db: &Database) -> Result<ListenerAvgMap> {
+    pub fn load(db: &Database, feed_id: i32) -> Result<Self> {
         use crate::database::listener_avgs::dsl::*;
 
-        let results = listener_avgs
-            .load::<Self>(db.conn())?
-            .into_iter()
-            .map(|avg| (avg.id as u32, avg))
-            .collect();
+        listener_avgs
+            .filter(id.eq(feed_id))
+            .get_result(db.conn())
+            .map_err(Into::into)
+    }
 
-        Ok(results)
+    pub fn load_or_new(db: &Database, feed_id: i32) -> Self {
+        Self::load(db, feed_id).unwrap_or_else(|_| Self::new(feed_id))
     }
 
     pub fn save_to_db(&self, db: &Database) -> diesel::QueryResult<usize> {
