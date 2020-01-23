@@ -7,7 +7,7 @@ mod err;
 mod feed;
 mod path;
 
-use crate::feed::stats::{ListenerAvgMap, ListenerStatMap, ListenerStats};
+use crate::feed::stats::{ListenerStatMap, ListenerStats};
 use crate::feed::{Feed, FeedNotif};
 use chrono::{Timelike, Utc};
 use clap::clap_app;
@@ -15,7 +15,6 @@ use config::Config;
 use database::Database;
 use diesel::prelude::*;
 use err::Result;
-use feed::stats::ListenerAvg;
 use smallvec::SmallVec;
 use std::sync::Arc;
 use std::thread;
@@ -44,9 +43,7 @@ fn run(args: clap::ArgMatches) -> Result<()> {
 
     init_signal_handler(&db)?;
 
-    let mut listener_avgs = ListenerAvgMap::with_capacity(200);
     let mut listener_stats = ListenerStatMap::with_capacity(200);
-
     let reload_config = args.is_present("RELOAD_CONFIG");
 
     loop {
@@ -57,7 +54,7 @@ fn run(args: clap::ArgMatches) -> Result<()> {
             }
         }
 
-        match run_update(&mut listener_stats, &mut listener_avgs, &db, &config) {
+        match run_update(&mut listener_stats, &db, &config) {
             Ok(mut notifs) => {
                 FeedNotif::sort_all(&mut notifs, &config);
 
@@ -74,7 +71,6 @@ fn run(args: clap::ArgMatches) -> Result<()> {
 
 fn run_update<'a>(
     listener_stats: &mut ListenerStatMap,
-    listener_avgs: &mut ListenerAvgMap,
     db: &Database,
     config: &Config,
 ) -> Result<SmallVec<[FeedNotif<'a>; 3]>> {
@@ -91,19 +87,12 @@ fn run_update<'a>(
 
     db.conn().transaction::<_, Error, _>(|| {
         for feed in feeds {
-            let avg = listener_avgs
-                .entry(feed.id)
-                .or_insert_with(|| ListenerAvg::load_or_new(db, feed.id as i32));
-
             let stats = listener_stats.entry(feed.id).or_insert_with(|| {
-                let listeners = avg.for_hour(hour).unwrap_or(feed.listeners as i32);
-                ListenerStats::new(listeners as u32)
+                ListenerStats::init_from_db(db, hour, feed.id as i32, feed.listeners as f32)
             });
 
-            stats.update(&feed, config);
-
-            avg.update_from_stats(hour, &stats);
-            avg.save_to_db(db)?;
+            stats.update(hour, &feed, config);
+            stats.save_to_db(db)?;
 
             if !stats.should_display_feed(&feed, config) {
                 continue;

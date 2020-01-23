@@ -148,17 +148,13 @@ impl ListenerAvg {
         *avg = Some(value);
         self.last_seen = Utc::now().naive_utc().date();
     }
-
-    pub fn update_from_stats(&mut self, hour: u32, stats: &ListenerStats) {
-        self.set_hour(hour, stats.current_listener_average() as i32);
-    }
 }
 
-pub type ListenerAvgMap = HashMap<u32, ListenerAvg>;
-
 /// Represents general statistical data for feeds.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ListenerStats {
+    /// The historical listener averages.
+    pub listener_avg: ListenerAvg,
     /// Represents the average number of listeners.
     pub average: Average,
     /// Represents the average number of listeners before a consistent spike occured.
@@ -172,8 +168,16 @@ pub struct ListenerStats {
 }
 
 impl ListenerStats {
-    pub fn new(listeners: u32) -> Self {
+    pub fn init_from_db(db: &Database, hour: u32, feed_id: i32, cur_listeners: f32) -> Self {
+        let listener_avg = ListenerAvg::load_or_new(db, feed_id);
+
+        let listeners = listener_avg
+            .for_hour(hour)
+            .map(|l| l as f32)
+            .unwrap_or(cur_listeners);
+
         Self {
+            listener_avg,
             average: Average::with_sample(listeners as f32),
             unskewed_average: None,
             jump: 0.0,
@@ -183,7 +187,7 @@ impl ListenerStats {
     }
 
     /// Updates the listener data and determines if the feed has spiked
-    pub fn update(&mut self, feed: &Feed, config: &Config) {
+    pub fn update(&mut self, hour: u32, feed: &Feed, config: &Config) {
         self.jump = feed.listeners as f32 - self.current_listener_average();
         self.has_spiked = self.is_spiking(feed, config);
 
@@ -195,6 +199,9 @@ impl ListenerStats {
 
         self.average.add_sample(feed.listeners as i32);
         self.update_unskewed_average(feed.listeners as f32, config);
+
+        self.listener_avg
+            .set_hour(hour, self.current_listener_average() as i32);
     }
 
     /// Returns true if the specified feed is currently spiking in listeners
@@ -270,6 +277,10 @@ impl ListenerStats {
 
         let has_alert = feed.alert.is_some() && config.misc.show_alert_feeds;
         self.has_spiked || has_alert
+    }
+
+    pub fn save_to_db(&self, db: &Database) -> diesel::QueryResult<usize> {
+        self.listener_avg.save_to_db(db)
     }
 }
 
