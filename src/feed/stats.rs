@@ -114,6 +114,15 @@ impl ListenerAvg {
             .execute(db.conn())
     }
 
+    pub fn remove_old_from_db(db: &Database) -> diesel::QueryResult<usize> {
+        use crate::database::listener_avgs::dsl::*;
+
+        let today = Utc::now();
+        let oldest_date = (today - Duration::days(30)).timestamp();
+
+        diesel::delete(listener_avgs.filter(last_seen.lt(oldest_date))).execute(db.conn())
+    }
+
     pub fn for_hour(&self, hour: u8) -> Option<i32> {
         if hour < 4 || hour > 23 {
             self.utc_0

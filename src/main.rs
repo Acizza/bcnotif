@@ -7,7 +7,7 @@ mod err;
 mod feed;
 mod path;
 
-use crate::feed::stats::{ListenerStatMap, ListenerStats};
+use crate::feed::stats::{ListenerAvg, ListenerStatMap, ListenerStats};
 use crate::feed::{Feed, FeedNotif};
 use chrono::{DateTime, Duration, Timelike, Utc};
 use clap::clap_app;
@@ -43,6 +43,7 @@ fn run(args: clap::ArgMatches) -> Result<()> {
     init_signal_handler(&db)?;
 
     let mut listener_stats = ListenerStatMap::with_capacity(200);
+    let mut remove_old_feeds_time = Utc::now();
     let reload_config = args.is_present("RELOAD_CONFIG");
 
     loop {
@@ -65,6 +66,11 @@ fn run(args: clap::ArgMatches) -> Result<()> {
             }
             Err(err) => err::display_error(err),
         };
+
+        if cur_time >= remove_old_feeds_time {
+            ListenerAvg::remove_old_from_db(&db)?;
+            remove_old_feeds_time = cur_time + Duration::hours(12);
+        }
 
         // Account for time drift so we always get updates at predictable times
         let update_time = cur_time + Duration::seconds((config.misc.update_time * 60.0) as i64);
