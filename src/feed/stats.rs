@@ -3,7 +3,7 @@ use crate::database::listener_avgs;
 use crate::database::Database;
 use crate::err::Result;
 use crate::feed::Feed;
-use chrono::{NaiveDate, Utc};
+use chrono::{Duration, Utc};
 use diesel::prelude::*;
 use std::collections::HashMap;
 
@@ -70,7 +70,7 @@ impl Default for Average {
 #[derive(Queryable, Insertable, Debug)]
 pub struct ListenerAvg {
     pub id: i32,
-    pub last_seen: NaiveDate,
+    pub last_seen: i64,
     pub utc_0: Option<i32>,
     pub utc_4: Option<i32>,
     pub utc_8: Option<i32>,
@@ -83,7 +83,7 @@ impl ListenerAvg {
     pub fn new(id: i32) -> Self {
         Self {
             id,
-            last_seen: Utc::now().naive_utc().date(),
+            last_seen: Utc::now().timestamp(),
             utc_0: None,
             utc_4: None,
             utc_8: None,
@@ -146,7 +146,7 @@ impl ListenerAvg {
         };
 
         *avg = Some(value);
-        self.last_seen = Utc::now().naive_utc().date();
+        self.last_seen = Utc::now().timestamp();
     }
 }
 

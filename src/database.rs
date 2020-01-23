@@ -7,7 +7,7 @@ use std::path::PathBuf;
 table! {
     listener_avgs {
         id -> Integer,
-        last_seen -> Date,
+        last_seen -> BigInt,
         utc_0 -> Nullable<Integer>,
         utc_4 -> Nullable<Integer>,
         utc_8 -> Nullable<Integer>,
