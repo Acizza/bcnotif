@@ -9,7 +9,7 @@ mod path;
 
 use crate::feed::stats::{ListenerStatMap, ListenerStats};
 use crate::feed::{Feed, FeedNotif};
-use chrono::{Timelike, Utc};
+use chrono::{DateTime, Duration, Timelike, Utc};
 use clap::clap_app;
 use config::Config;
 use database::Database;
@@ -18,7 +18,6 @@ use err::Result;
 use smallvec::SmallVec;
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
 
 fn main() {
     let args = clap_app!(bcnotif =>
@@ -47,6 +46,8 @@ fn run(args: clap::ArgMatches) -> Result<()> {
     let reload_config = args.is_present("RELOAD_CONFIG");
 
     loop {
+        let cur_time = Utc::now();
+
         if reload_config {
             match Config::load() {
                 Ok(new) => config = new,
@@ -54,7 +55,7 @@ fn run(args: clap::ArgMatches) -> Result<()> {
             }
         }
 
-        match run_update(&mut listener_stats, &db, &config) {
+        match run_update(&db, &config, &cur_time, &mut listener_stats) {
             Ok(mut notifs) => {
                 FeedNotif::sort_all(&mut notifs, &config);
 
@@ -65,14 +66,22 @@ fn run(args: clap::ArgMatches) -> Result<()> {
             Err(err) => err::display_error(err),
         };
 
-        thread::sleep(Duration::from_secs((config.misc.update_time * 60.0) as u64));
+        // Account for time drift so we always get updates at predictable times
+        let update_time = cur_time + Duration::seconds((config.misc.update_time * 60.0) as i64);
+        let sleep_time = update_time
+            .signed_duration_since(Utc::now())
+            .to_std()
+            .unwrap_or_else(|_| std::time::Duration::from_secs(5 * 60));
+
+        thread::sleep(sleep_time);
     }
 }
 
 fn run_update<'a>(
-    listener_stats: &mut ListenerStatMap,
     db: &Database,
     config: &Config,
+    cur_time: &DateTime<Utc>,
+    listener_stats: &mut ListenerStatMap,
 ) -> Result<SmallVec<[FeedNotif<'a>; 3]>> {
     use diesel::result::Error;
 
@@ -82,16 +91,16 @@ fn run_update<'a>(
         feeds
     };
 
-    let hour = Utc::now().hour();
+    let cur_hour = cur_time.hour() as u8;
     let mut display = SmallVec::new();
 
     db.conn().transaction::<_, Error, _>(|| {
         for feed in feeds {
             let stats = listener_stats.entry(feed.id).or_insert_with(|| {
-                ListenerStats::init_from_db(db, hour, feed.id as i32, feed.listeners as f32)
+                ListenerStats::init_from_db(db, cur_hour, feed.id as i32, feed.listeners as f32)
             });
 
-            stats.update(hour, &feed, config);
+            stats.update(cur_hour, &feed, config);
             stats.save_to_db(db)?;
 
             if !stats.should_display_feed(&feed, config) {

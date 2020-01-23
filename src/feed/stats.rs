@@ -114,7 +114,7 @@ impl ListenerAvg {
             .execute(db.conn())
     }
 
-    pub fn for_hour(&self, hour: u32) -> Option<i32> {
+    pub fn for_hour(&self, hour: u8) -> Option<i32> {
         if hour < 4 || hour > 23 {
             self.utc_0
         } else if hour < 8 {
@@ -130,7 +130,7 @@ impl ListenerAvg {
         }
     }
 
-    pub fn set_hour(&mut self, hour: u32, value: i32) {
+    pub fn set_hour(&mut self, hour: u8, value: i32) {
         let avg = if hour < 4 || hour > 23 {
             &mut self.utc_0
         } else if hour < 8 {
@@ -168,7 +168,7 @@ pub struct ListenerStats {
 }
 
 impl ListenerStats {
-    pub fn init_from_db(db: &Database, hour: u32, feed_id: i32, cur_listeners: f32) -> Self {
+    pub fn init_from_db(db: &Database, hour: u8, feed_id: i32, cur_listeners: f32) -> Self {
         let listener_avg = ListenerAvg::load_or_new(db, feed_id);
 
         let listeners = listener_avg
@@ -187,7 +187,7 @@ impl ListenerStats {
     }
 
     /// Updates the listener data and determines if the feed has spiked
-    pub fn update(&mut self, hour: u32, feed: &Feed, config: &Config) {
+    pub fn update(&mut self, hour: u8, feed: &Feed, config: &Config) {
         self.jump = feed.listeners as f32 - self.current_listener_average();
         self.has_spiked = self.is_spiking(feed, config);
 
