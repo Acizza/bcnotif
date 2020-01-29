@@ -23,157 +23,82 @@ This program runs in the background, so it can be launched and forgotten about. 
 
 # Configuration
 
-To configure the program, first create or open the file at `~/.config/bcnotif/config.yaml`.
+To configure the program, first create and open the file at `~/.config/bcnotif/config.toml`.
 
-Current configuration options include adding a state to monitor, changing the update time, changing the order feeds are displayed in, and using different spike values (which determine if a feed has suddenly jumped in listeners) for different days of the week, or for a certain feed ID, state, county, or feed name.
+In addition to the top 50 feeds on Broadcastify, you can specify the ID of a state that you also want to be processed during an update. This option can be specified as follows in your configuration file:
 
-For example, to process a certain state's feeds during an update (in addition to the top 50), you can add this to the config file:
-```yaml
-Misc:
-  State Feeds ID: 6 # California
+```toml
+[misc]
+state_id = 6 # California
 ```
 
-Since there is no convenient way to find states by their name, you will have to provide its ID instead. To get a state's ID:
+To obtain a state's ID:
+1. Open [this link](https://www.broadcastify.com/listen/)
+2. Select the state you want to process feeds from
+3. Copy the number from the end of the resulting URL
 
-1. Go to this [URL](https://www.broadcastify.com/listen/)
-1. Select the state you want to process feeds from
-1. Copy the number from the end of the resulting URL
+You can also modify how the program processes feeds using certain "selectors", as well as how they are processed on specific weekdays. These selectors currently include a feed's ID, county, state ID, as well as a global selector to match any feed. This system makes it very easy to make feeds located in your state or county more (or less) sensitive to listener jumps.
 
-Another common configuration would be increase the spike values for the weekend. An example of such configuration is as follows:
-```yaml
-Weekday Spike Percentages:
-  - Friday:
-    Jump Required: 0.4
-  - Saturday:
-    Jump Required: 0.4
-  - Sunday:
-    Jump Required: 0.4
+The following example will require all feeds located in "Sacramento County" to jump in listeners by 50% in order to show an alert:
+
+```toml
+[feed."county(Sacramento County)"]
+jump_required = 50
 ```
 
-The above configuration will increase the jump required for Friday, Saturday, and Sunday by 10% from the default, which will reduce the otherwise increased feed updates since more people have the opportunity to listen to feeds on the weekend.
+You can also use this system to only apply your feed settings on specific days of the week. The following example does the same thing as the one above, but it will only be applied on Wednesday:
 
-Yet another common configuration would be to make feeds in your local area more sensitive to updates, like so:
-```yaml
-Feed Settings:
-  - County: Sacramento
-    Spike Percentages:
-      Jump Required: 0.25
+```toml
+[weekday.wednesday."county(Sacramento County)"]
+jump_required = 50
 ```
 
-The above configuration will make feeds in Sacramento 5% more sensitive to feed fluctuations than normal. Note that there are other ways to specify what feeds you want to modify, and are explained at the example at the bottom of this section.
+The following shows a complete configuration file, will all options filled in various configurations:
 
-Naturally, you can also combine the above configurations to do something like process all feeds in California, make feeds in Sacramento more sensitive, and increase the jump required for the weekend, like so:
-```yaml
-Misc:
-  State Feeds ID: 6 # California
+```toml
+# The feed with ID 123 will need to jump by 47.23% on Saturday in order to show an alert for it.
+# When specifying weekdays, you can use either the short or long name.
+[weekday.sat."id(123)"]
+jump_required = 47.23
 
-Feed Settings:
-  - County: Sacramento
-    Spike Percentages:
-      Jump Required: 0.25
+# All feeds on Sunday will need to jump by 70% in order to show alerts for them.
+[weekday.sunday.global]
+jump_required = 70
 
-Weekday Spike Percentages:
-  - Friday:
-    Jump Required: 0.4
-  - Saturday:
-    Jump Required: 0.4
-  - Sunday:
-    Jump Required: 0.4
-```
+# This is the default jump percentage used by all feeds.
+[feed.global]
+jump_required = 40
 
-Since explaining all of the configuration layouts would be complicated, here is an example showing all of the configuration options in use with their default values (also note that virtually all fields are optional):
+# All feeds in California (state ID 6) will only have to jump by 35% in order to show an alert for them.
+[feed."state(6)"]
+jump_required = 35
 
-```yaml
-# Miscellaneous options
-Misc:
-  Update Time: 6        # The time in minutes to wait to perform an update
-  Minimum Listeners: 15 # Feeds below this value will never be processed
-  State Feeds ID: 0     # The state to process extra feed from in an update. It is not set by default
-  Maximum Feeds To Display: 10
-  Show Alert Feeds: true # Sets whether or not any feed that has an alert should be displayed regardless if it's spiking or not
-  Max Times To Show Feed: 0 # This controls how many times a feed can be showed in a row before notifications are disabled for it. It is not set by default.
+[misc]
+# How often to run feed updates in minutes. This is the default.
+update_time_mins = 6
+# The minimum number of listeners a feed must have to process it. This is the default.
+minimum_listeners = 15
+# The state feeds to process in addition to the top 50 feeds. This is not set by default.
+state_id = 6
+# The maximum number of feeds to display an alert for at once. This is the default.
+show_max = 10
+# The maximum number of times to show a feed that's alerting consecutively. This is not set by default.
+show_max_times = 5
+# Specifies whether or not feeds that have an alert attached to them should be shown regardless of them spiking in listeners. This is the default. Possible values are "true" and "false".
+show_alert_feeds = true
 
-# This controls the global spike values (which are used to determine if a feed is jumping in listeners)
-Spike Percentages:
-  # This is the jump multiplier required for a feed to be considered "jumping".
-  # Ex: If a feed's listeners are 30% higher than its current average listeners, it will be displayed
-  Jump Required: 0.3
-  # This controls how much (as a multiplier) the jump required for a feed will increase when its listeners are less than 50
-  Low Listener Increase: 0.02
-  # This is used along with the "High Listener Decrease Per Listeners" value to control how much the jump required will decrease when a feed is jumping to encourage further notifications
-  High Listener Decrease: 0.02
-  # This will decrease the jump required multiplier by the "High Listener Decrease" value for every x listeners set by this value
-  High Listener Decrease Per Listeners: 100.0
+# This section controls the order notifications are shown for feeds.
+[sorting]
+# The value to sort feeds by. This is the default. Possible values are "jump" and "listeners".
+# The "jump" value means that feeds are sorted by how large their listener jump is.
+value = "jump"
+# The order to sort the feeds in, based off the specified value field above. This is the default. Possible values are "descending" and "ascending".
+order = "descending"
 
-# This controls what spike values should be used on a specific day of the week. Note that this is empty by default
-Weekday Spike Percentages:
-  # As you would expect, any day of the week can be used here, and the values of each day are identical to the "Spike Percentages" category above
-  - Saturday:
-    Jump Required: 0.3
-    High Listener Decrease: 0.03
-  - Sunday:
-    Jump Required: 0.3
-    High Listener Decrease: 0.03
-
-# Feed-specific settings that apply to a feed name, feed ID, state, or county. Note that this is empty by default
-Feed Settings:
-  # This setting will only apply to a feed named "Test Feed"
-  - Name: Test Feed
-    # This category is identical the "Spike Percentages" one above, but it only applies to this feed group
-    Spike Percentages:
-      Jump Required: 0.3
-      High Listener Decrease: 0.02
-    # This category is identical the "Weekday Spike Percentages" one above, but it only applies to this feed group
-    Weekday Spike Percentages:
-      - Monday:
-        Jump Required: 0.3
-      - Friday:
-        Jump Required: 0.3
-  # This setting works the same way as the one above, but takes a feed ID instead
-  - ID: 5698
-    Spike Percentages:
-      Jump Required: 0.3
-  # And this one applies to an entire county
-  - County: Sacramento
-    Spike Percentages:
-      Jump Required: 0.3
-  # And this one applies to an entire state
-  - State ID: 6 # California
-    Spike Percentages:
-      Jump Required: 0.3
-
-# Changes what order feeds are displayed in
-Feed Sorting:
-  # Selects what metric feeds should be sorted by. Value can either be "Jump" or "Listeners"
-  Sort By: Listeners
-  # Changes what order feeds will be displayed in. Value can either be "Descending" or "Ascending"
-  Sort Order: Descending
-
-# Prevents certain feeds from displaying. Can specify a feed ID, state ID, county, or name. It is empty by default
-Blacklist:
-  # Note that these are all different filters
-  - ID: 0
-  - State ID: 0
-  - County: Nowhereville
-  - Name: Test Feed
-  - County: Nonexistentville
-
-# Only allows certain feeds to display. Allows the same identification types as the blacklist above. It is empty by default
-Whitelist:
-  - ID: 0
-  - State ID: 0
-  - County: Nowhereville
-  - Name: Test Feed
-  - County: Nonexistentville
-
-# This category contains settings for the average of every feed that isn't biased towards large jumps in listeners. You should very rarely ever have to adjust any of these
-Unskewed Average:
-  # How close the feed's current listeners have to be to the unskewed average to remove it
-  Reset To Average Percentage: 0.15
-  # How much the unskewed average should slowly inch towards the current feed average to avoid lingering around forever in some cases
-  Adjust To Average Percentage: 0.0075
-  # How many times a feed needs to jump consecutively for the unskewed average to be set
-  Spikes Required: 1
-  # How much (as a multiplier) the current listeners of a feed need to be above the saved average to set the unskewed average immediately
-  Jump Required To Set: 4.0
+# This section allows you to blacklist and whitelist feeds, using the same selectors that are used in the feed and weekday sections.
+[filters]
+# This will prevent the feed with ID 1, feeds in the county "example county", and all feeds in Alabama (state ID 1) from ever showing. This is not set by default.
+blacklist = [ "id(1)", "county(example county)", "state(1)" ]
+# This only allows feeds in Alaska (state ID 2) and the feed with ID 123 to ever show. This is not set by default.
+whitelist = [ "state(2)", "id(123)" ]
 ```
