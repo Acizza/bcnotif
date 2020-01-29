@@ -3,7 +3,7 @@ use crate::database::listener_avgs;
 use crate::database::Database;
 use crate::err::Result;
 use crate::feed::Feed;
-use chrono::{Duration, Utc};
+use chrono::{Duration, Utc, Weekday};
 use diesel::prelude::*;
 use std::collections::HashMap;
 
@@ -177,6 +177,15 @@ pub struct ListenerStats {
 }
 
 impl ListenerStats {
+    const LOW_LISTENER_INCREASE: f32 = 0.005;
+    const HIGH_LISTENER_DEC: f32 = 0.02;
+    const HIGH_LISTENER_DEC_PER_LISTENERS: f32 = 100.0;
+
+    const RESET_UNSKEWED_AVG_PCNT: f32 = 0.15;
+    const JUMP_TO_SET_UNSKEWED_AVG: f32 = 4.0;
+    const UNSKEWED_ADJUST_PCNT: f32 = 0.0075;
+    const UNSKEWED_SPIKES_REQUIRED: u32 = 1;
+
     pub fn init_from_db(db: &Database, hour: u8, feed_id: i32, cur_listeners: f32) -> Self {
         let listener_avg = ListenerAvg::load_or_new(db, feed_id);
 
@@ -196,9 +205,9 @@ impl ListenerStats {
     }
 
     /// Updates the listener data and determines if the feed has spiked
-    pub fn update(&mut self, hour: u8, feed: &Feed, config: &Config) {
+    pub fn update(&mut self, hour: u8, feed: &Feed, config: &Config, weekday: Weekday) {
         self.jump = feed.listeners as f32 - self.current_listener_average();
-        self.has_spiked = self.is_spiking(feed, config);
+        self.has_spiked = self.is_spiking(feed, config, weekday);
 
         self.spike_count = if self.has_spiked {
             self.spike_count + 1
@@ -207,7 +216,7 @@ impl ListenerStats {
         };
 
         self.average.add_sample(feed.listeners as i32);
-        self.update_unskewed_average(feed.listeners as f32, config);
+        self.update_unskewed_average(feed.listeners as f32);
 
         self.listener_avg
             .set_hour(hour, self.current_listener_average() as i32);
@@ -215,54 +224,54 @@ impl ListenerStats {
 
     /// Returns true if the specified feed is currently spiking in listeners
     /// based off of previous data collected by self.update().
-    fn is_spiking(&self, feed: &Feed, config: &Config) -> bool {
+    fn is_spiking(&self, feed: &Feed, config: &Config, weekday: Weekday) -> bool {
         if self.average.current == 0.0 {
             return false;
         }
 
-        let spike_cfg = config.get_feed_spike(feed);
+        let feed_cfg = config.options_for_feed(feed, weekday);
+        let jump_required = feed_cfg.jump_required.as_mult();
         let listeners = feed.listeners as f32;
 
         // If a feed has a low number of listeners, use a higher threshold to
         // make the calculation less sensitive to very small listener jumps
         let threshold = if listeners < 50.0 {
-            spike_cfg.jump + (50.0 - listeners) * spike_cfg.low_listener_increase
+            jump_required + (50.0 - listeners) * Self::LOW_LISTENER_INCREASE
         } else {
             // Otherwise, use a lower threshold based off of how fast the feed's
             // listeners are rising to encourage more updates during large incidents
             let rise_amount =
-                self.jump / spike_cfg.high_listener_dec_every * spike_cfg.high_listener_dec;
+                self.jump / Self::HIGH_LISTENER_DEC_PER_LISTENERS * Self::HIGH_LISTENER_DEC;
 
-            spike_cfg.jump - rise_amount.min(spike_cfg.jump - 0.01)
+            jump_required - rise_amount.min(jump_required - 0.01)
         };
 
         listeners - self.average.current >= listeners * threshold
     }
 
-    fn update_unskewed_average(&mut self, listeners: f32, config: &Config) {
+    fn update_unskewed_average(&mut self, listeners: f32) {
         if let Some(unskewed) = self.unskewed_average {
             // Remove the unskewed average if the current average is close to it
-            if self.average.current - unskewed < unskewed * config.unskewed_avg.reset_pcnt {
+            if self.average.current - unskewed < unskewed * Self::RESET_UNSKEWED_AVG_PCNT {
                 self.unskewed_average = None;
                 return;
             }
 
             // Otherwise, if there isn't a huge jump in listeners, slowly increase
             // the unskewed average to adjust to natural listener increases
-            if listeners - unskewed < unskewed * config.unskewed_avg.jump_required {
+            if listeners - unskewed < unskewed * Self::JUMP_TO_SET_UNSKEWED_AVG {
                 self.unskewed_average = Some(lerp(
                     unskewed,
                     self.average.current,
-                    config.unskewed_avg.adjust_pcnt,
+                    Self::UNSKEWED_ADJUST_PCNT,
                 ));
             }
         } else if self.has_spiked && self.average.last > 0.0 {
             // This is used to set the unskewed average if the listener count is
             // much higher than the average to avoid polluting the average listener
             // count with a very high value
-            let has_large_jump = listeners > self.average.last * config.unskewed_avg.jump_required;
-
-            let has_spiked_enough = self.spike_count > config.unskewed_avg.spikes_required;
+            let has_large_jump = listeners > self.average.last * Self::JUMP_TO_SET_UNSKEWED_AVG;
+            let has_spiked_enough = self.spike_count > Self::UNSKEWED_SPIKES_REQUIRED;
 
             if has_spiked_enough || has_large_jump {
                 self.unskewed_average = Some(self.average.last);
@@ -278,7 +287,7 @@ impl ListenerStats {
     }
 
     pub fn should_display_feed(&self, feed: &Feed, config: &Config) -> bool {
-        if let Some(max_times) = config.misc.max_times_to_show_feed {
+        if let Some(max_times) = config.misc.show_max_times {
             if self.spike_count > max_times {
                 return false;
             }

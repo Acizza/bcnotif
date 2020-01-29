@@ -9,7 +9,7 @@ mod path;
 
 use crate::feed::stats::{ListenerAvg, ListenerStatMap, ListenerStats};
 use crate::feed::{Feed, FeedNotif};
-use chrono::{DateTime, Duration, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, Local, Timelike, Utc};
 use clap::clap_app;
 use config::Config;
 use database::Database;
@@ -37,7 +37,7 @@ fn main() {
 }
 
 fn run(args: clap::ArgMatches) -> Result<()> {
-    let mut config = Config::load()?;
+    let mut config = Config::load_or_new()?;
     let db = Arc::new(Database::open()?);
 
     init_signal_handler(&db)?;
@@ -73,7 +73,9 @@ fn run(args: clap::ArgMatches) -> Result<()> {
         }
 
         // Account for time drift so we always get updates at predictable times
-        let update_time = cur_time + Duration::seconds((config.misc.update_time * 60.0) as i64);
+        let update_time =
+            cur_time + Duration::seconds((config.misc.update_time_mins * 60.0) as i64);
+
         let sleep_time = update_time
             .signed_duration_since(Utc::now())
             .to_std()
@@ -98,6 +100,8 @@ fn run_update<'a>(
     };
 
     let cur_hour = cur_time.hour() as u8;
+    let cur_weekday = Local::today().weekday();
+
     let mut display = SmallVec::new();
 
     db.conn().transaction::<_, Error, _>(|| {
@@ -106,14 +110,14 @@ fn run_update<'a>(
                 ListenerStats::init_from_db(db, cur_hour, feed.id as i32, feed.listeners as f32)
             });
 
-            stats.update(cur_hour, &feed, config);
+            stats.update(cur_hour, &feed, config, cur_weekday);
             stats.save_to_db(db)?;
 
             if !stats.should_display_feed(&feed, config) {
                 continue;
             }
 
-            if display.len() > config.misc.max_feeds as usize {
+            if display.len() > config.misc.show_max as usize {
                 continue;
             }
 
@@ -127,18 +131,20 @@ fn run_update<'a>(
 }
 
 fn filter_feeds(config: &Config, feeds: &mut Vec<Feed>) {
-    if !config.whitelist.is_empty() {
+    if !config.filters.whitelist.is_empty() {
         feeds.retain(|feed| {
             config
+                .filters
                 .whitelist
                 .iter()
                 .any(|entry| entry.matches_feed(feed))
         });
     }
 
-    if !config.blacklist.is_empty() {
+    if !config.filters.blacklist.is_empty() {
         feeds.retain(|feed| {
             config
+                .filters
                 .blacklist
                 .iter()
                 .any(|entry| !entry.matches_feed(feed))

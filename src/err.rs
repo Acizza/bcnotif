@@ -1,6 +1,7 @@
 use notify_rust::Notification;
 use snafu::{Backtrace, ErrorCompat, GenerateBacktrace, Snafu};
 use std::io;
+use std::path;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -9,6 +10,13 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[snafu(display("io error: {}", source))]
     IO {
+        source: io::Error,
+        backtrace: Backtrace,
+    },
+
+    #[snafu(display("file io error at {}: {}", path.display(), source))]
+    FileIO {
+        path: path::PathBuf,
         source: io::Error,
         backtrace: Backtrace,
     },
@@ -37,9 +45,10 @@ pub enum Error {
         backtrace: Backtrace,
     },
 
-    #[snafu(display("YAML error: {}", source))]
-    YAMLScan {
-        source: yaml_rust::ScanError,
+    #[snafu(display("error decoding TOML {} file: {}", name, source))]
+    TOMLDecode {
+        name: &'static str,
+        source: toml::de::Error,
         backtrace: Backtrace,
     },
 
@@ -56,7 +65,7 @@ pub enum Error {
 impl Error {
     pub fn is_file_nonexistant(&self) -> bool {
         match self {
-            Error::IO { source, .. } => source.kind() == io::ErrorKind::NotFound,
+            Error::FileIO { source, .. } => source.kind() == io::ErrorKind::NotFound,
             _ => false,
         }
     }
@@ -101,15 +110,6 @@ impl From<diesel::result::ConnectionError> for Error {
 impl From<ctrlc::Error> for Error {
     fn from(source: ctrlc::Error) -> Self {
         Self::CtrlC {
-            source,
-            backtrace: Backtrace::generate(),
-        }
-    }
-}
-
-impl From<yaml_rust::ScanError> for Error {
-    fn from(source: yaml_rust::ScanError) -> Self {
-        Self::YAMLScan {
             source,
             backtrace: Backtrace::generate(),
         }

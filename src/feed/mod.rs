@@ -26,7 +26,7 @@ impl<'a> Feed<'a> {
     pub fn scrape_all(config: &Config) -> Result<Vec<Self>> {
         let mut feeds = Self::scrape_source(Source::Top50, config.misc.minimum_listeners)?;
 
-        if let Some(state_id) = config.misc.state_feeds_id {
+        if let Some(state_id) = config.misc.state_id {
             let state_feeds =
                 Self::scrape_source(Source::State(state_id), config.misc.minimum_listeners)?;
 
@@ -165,12 +165,12 @@ impl<'a> FeedNotif<'a> {
         use crate::config::{SortOrder, SortType};
 
         notifs.sort_unstable_by(|x, y| {
-            let (x, y) = match config.sorting.sort_order {
+            let (x, y) = match config.sorting.order {
                 SortOrder::Ascending => (x, y),
                 SortOrder::Descending => (y, x),
             };
 
-            match config.sorting.sort_type {
+            match config.sorting.value {
                 SortType::Listeners => x.feed.listeners.cmp(&y.feed.listeners),
                 SortType::Jump => {
                     let x_jump = x.jump as i32;
