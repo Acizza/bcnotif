@@ -58,8 +58,7 @@ impl Config {
         selector
             .iter()
             .find(|(sel, _)| sel.matches_feed(feed))
-            .map(|(_, value)| Cow::Borrowed(value))
-            .unwrap_or_else(|| Cow::Owned(FeedOptions::default()))
+            .map_or_else(|| FeedOptions::default().into(), |(_, value)| value.into())
     }
 }
 
@@ -90,6 +89,18 @@ impl Default for FeedOptions {
             jump_required: Self::jump_required_default(),
             jump_required_unskewed: Self::jump_required_unskewed_default(),
         }
+    }
+}
+
+impl<'a> Into<Cow<'a, Self>> for FeedOptions {
+    fn into(self) -> Cow<'a, Self> {
+        Cow::Owned(self)
+    }
+}
+
+impl<'a> Into<Cow<'a, FeedOptions>> for &'a FeedOptions {
+    fn into(self) -> Cow<'a, FeedOptions> {
+        Cow::Borrowed(self)
     }
 }
 

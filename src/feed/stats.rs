@@ -191,8 +191,7 @@ impl ListenerStats {
 
         let listeners = listener_avg
             .for_hour(hour)
-            .map(|l| l as f32)
-            .unwrap_or(cur_listeners);
+            .map_or(cur_listeners, |l| l as f32);
 
         Self {
             listener_avg,
