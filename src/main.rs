@@ -16,7 +16,9 @@ use database::Database;
 use diesel::prelude::*;
 use err::Result;
 use smallvec::SmallVec;
+use std::sync::mpsc;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread;
 
 fn main() {
@@ -36,52 +38,102 @@ fn main() {
     }
 }
 
-fn run(args: clap::ArgMatches) -> Result<()> {
-    let mut config = Config::load_or_new()?;
-    let db = Arc::new(Database::open()?);
+enum Event {
+    RunUpdate,
+    Exit,
+}
 
-    init_signal_handler(&db)?;
+impl Event {
+    fn init_threads(config: &Arc<Mutex<Config>>) -> Result<mpsc::Receiver<Event>> {
+        let (tx, rx) = mpsc::channel();
+
+        Self::spawn_update_thread(tx.clone(), config);
+        Self::spawn_signal_handler(tx)?;
+
+        Ok(rx)
+    }
+
+    fn spawn_update_thread(
+        tx: mpsc::Sender<Self>,
+        config: &Arc<Mutex<Config>>,
+    ) -> thread::JoinHandle<()> {
+        let config = config.clone();
+
+        // This thread should die if something goes horribly wrong, so the uses of unwrap() are intended here
+        thread::spawn(move || loop {
+            let update_time = {
+                let config = config.lock().unwrap();
+                (config.misc.update_time_mins * 60.0) as u64
+            };
+
+            tx.send(Event::RunUpdate).unwrap();
+            thread::sleep(std::time::Duration::from_secs(update_time));
+        })
+    }
+
+    fn spawn_signal_handler(tx: mpsc::Sender<Self>) -> Result<()> {
+        ctrlc::set_handler(move || {
+            tx.send(Event::Exit).ok();
+        })
+        .map_err(Into::into)
+    }
+}
+
+fn run(args: clap::ArgMatches) -> Result<()> {
+    let config = Arc::new(Mutex::new(Config::load_or_new()?));
+    let db = Database::open()?;
 
     let mut listener_stats = ListenerStatMap::with_capacity(200);
     let mut remove_old_feeds_time = Utc::now();
     let reload_config = args.is_present("RELOAD_CONFIG");
 
+    let event_rx = Event::init_threads(&config)?;
+
     loop {
-        let cur_time = Utc::now();
+        match event_rx.recv() {
+            Ok(Event::RunUpdate) => {
+                let cur_time = Utc::now();
 
-        if reload_config {
-            match Config::load() {
-                Ok(new) => config = new,
-                Err(err) => err::display_error(err),
-            }
-        }
+                let mut config = match config.lock() {
+                    Ok(config) => config,
+                    Err(_) => {
+                        err::display_error(err::Error::PoisonedMutex { name: "config" });
+                        continue;
+                    }
+                };
 
-        match run_update(&db, &config, &cur_time, &mut listener_stats) {
-            Ok(mut notifs) => {
-                FeedNotif::sort_all(&mut notifs, &config);
+                if reload_config {
+                    match Config::load() {
+                        Ok(new) => *config = new,
+                        Err(err) => err::display_error(err),
+                    }
+                }
 
-                if let Err(err) = FeedNotif::show_all(&notifs) {
+                let result = run_update(&db, &config, &cur_time, &mut listener_stats).and_then(
+                    |mut notifs| {
+                        FeedNotif::sort_all(&mut notifs, &config);
+                        FeedNotif::show_all(&notifs)
+                    },
+                );
+
+                if let Err(err) = result {
                     err::display_error(err);
                 }
+
+                if cur_time >= remove_old_feeds_time {
+                    ListenerAvg::remove_old_from_db(&db)?;
+                    remove_old_feeds_time = cur_time + Duration::hours(12);
+                }
             }
-            Err(err) => err::display_error(err),
-        };
+            Ok(Event::Exit) => {
+                if let Err(err) = db.optimize() {
+                    err::display_error(err.into());
+                }
 
-        if cur_time >= remove_old_feeds_time {
-            ListenerAvg::remove_old_from_db(&db)?;
-            remove_old_feeds_time = cur_time + Duration::hours(12);
+                break Ok(());
+            }
+            Err(err) => break Err(err.into()),
         }
-
-        // Account for time drift so we always get updates at predictable times
-        let update_time =
-            cur_time + Duration::seconds((config.misc.update_time_mins * 60.0) as i64);
-
-        let sleep_time = update_time
-            .signed_duration_since(Utc::now())
-            .to_std()
-            .unwrap_or_else(|_| std::time::Duration::from_secs(5 * 60));
-
-        thread::sleep(sleep_time);
     }
 }
 
@@ -150,17 +202,4 @@ fn filter_feeds(config: &Config, feeds: &mut Vec<Feed>) {
                 .any(|entry| !entry.matches_feed(feed))
         });
     }
-}
-
-fn init_signal_handler(db: &Arc<Database>) -> Result<()> {
-    let db = db.clone();
-
-    ctrlc::set_handler(move || {
-        if let Err(err) = db.optimize() {
-            err::display_error(err.into());
-        }
-
-        std::process::exit(0);
-    })
-    .map_err(Into::into)
 }

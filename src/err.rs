@@ -2,6 +2,7 @@ use notify_rust::Notification;
 use snafu::{Backtrace, ErrorCompat, GenerateBacktrace, Snafu};
 use std::io;
 use std::path;
+use std::sync::mpsc;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -51,6 +52,15 @@ pub enum Error {
         source: toml::de::Error,
         backtrace: Backtrace,
     },
+
+    #[snafu(display("mpsc receive error: {}", source))]
+    MPSCRecv {
+        source: mpsc::RecvError,
+        backtrace: Backtrace,
+    },
+
+    #[snafu(display("mutex lock poisoned for {}", name))]
+    PoisonedMutex { name: &'static str },
 
     #[snafu(display("failed to parse top feeds: {}", source))]
     ParseTopFeeds { source: ScrapeError },
@@ -110,6 +120,15 @@ impl From<diesel::result::ConnectionError> for Error {
 impl From<ctrlc::Error> for Error {
     fn from(source: ctrlc::Error) -> Self {
         Self::CtrlC {
+            source,
+            backtrace: Backtrace::generate(),
+        }
+    }
+}
+
+impl From<mpsc::RecvError> for Error {
+    fn from(source: mpsc::RecvError) -> Self {
+        Self::MPSCRecv {
             source,
             backtrace: Backtrace::generate(),
         }
