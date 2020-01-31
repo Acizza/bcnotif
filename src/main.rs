@@ -16,9 +16,7 @@ use database::Database;
 use diesel::prelude::*;
 use err::Result;
 use smallvec::SmallVec;
-use std::sync::mpsc;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
 fn main() {
