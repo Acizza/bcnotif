@@ -42,7 +42,7 @@ enum Event {
 }
 
 impl Event {
-    fn init_threads(config: &Arc<Mutex<Config>>) -> Result<mpsc::Receiver<Event>> {
+    fn init_threads(config: &Arc<Mutex<Config>>) -> Result<mpsc::Receiver<Self>> {
         let (tx, rx) = mpsc::channel();
 
         Self::spawn_update_thread(tx.clone(), config);
