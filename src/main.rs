@@ -10,22 +10,25 @@ mod path;
 use crate::feed::stats::{ListenerAvg, ListenerStatMap, ListenerStats};
 use crate::feed::{Feed, FeedNotif};
 use chrono::{DateTime, Datelike, Duration, Local, Timelike, Utc};
-use clap::clap_app;
 use config::Config;
 use database::Database;
 use diesel::prelude::*;
 use err::Result;
+use gumdrop::Options;
 use smallvec::SmallVec;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
+#[derive(Options)]
+struct CmdOptions {
+    #[options(help = "print help message")]
+    help: bool,
+    #[options(help = "reload the configuration file on each update")]
+    reload_config: bool,
+}
+
 fn main() {
-    let args = clap_app!(bcnotif =>
-        (version: env!("CARGO_PKG_VERSION"))
-        (author: env!("CARGO_PKG_AUTHORS"))
-        (@arg RELOAD_CONFIG: -r --reloadconfig "Reload the configuration file on every update")
-    )
-    .get_matches();
+    let args = CmdOptions::parse_args_default_or_exit();
 
     match run(args) {
         Ok(_) => (),
@@ -77,13 +80,12 @@ impl Event {
     }
 }
 
-fn run(args: clap::ArgMatches) -> Result<()> {
+fn run(args: CmdOptions) -> Result<()> {
     let config = Arc::new(Mutex::new(Config::load_or_new()?));
     let db = Database::open()?;
 
     let mut listener_stats = ListenerStatMap::with_capacity(200);
     let mut remove_old_feeds_time = Utc::now();
-    let reload_config = args.is_present("RELOAD_CONFIG");
 
     let event_rx = Event::init_threads(&config)?;
 
@@ -100,7 +102,7 @@ fn run(args: clap::ArgMatches) -> Result<()> {
                     }
                 };
 
-                if reload_config {
+                if args.reload_config {
                     match Config::load() {
                         Ok(new) => *config = new,
                         Err(err) => err::display_error(err),
