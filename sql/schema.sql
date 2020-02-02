@@ -1,7 +1,6 @@
 PRAGMA locking_mode = EXCLUSIVE;
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
-PRAGMA wal_autocheckpoint = 50;
 
 CREATE TABLE IF NOT EXISTS listener_avgs (
     id INTEGER NOT NULL PRIMARY KEY,
