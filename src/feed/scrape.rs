@@ -1,6 +1,8 @@
 use crate::err::ScrapeError;
 use crate::feed::{Feed, Location};
+use num_traits::FromPrimitive;
 use smallvec::SmallVec;
+use std::borrow::Cow;
 
 type Result<T> = std::result::Result<T, ScrapeError>;
 
@@ -47,14 +49,16 @@ where
                 continue;
             }
 
-            let state_info = try_cont!(Link::parse(&links[1]));
-            let location = Location::with_state(state_info.href_id, state_info.value);
+            let loc_id = try_cont!(Link::parse_href_id(&links[1]));
 
             let county = if links.len() > 2 {
                 try_cont!(tag_body(&links[2], "</")).to_string().into()
             } else {
-                "Numerous".into()
+                Cow::Borrowed("Numerous")
             };
+
+            let location = Location::from_i64(loc_id as i64)
+                .ok_or_else(|| ScrapeError::UnknownLocation { id: loc_id })?;
 
             (location, county)
         };
@@ -85,7 +89,11 @@ where
     Ok(feeds)
 }
 
-pub fn scrape_state<'a, S>(body: S, min_listeners: u32, state_id: u32) -> Result<Vec<Feed<'a>>>
+pub fn scrape_location<'a, S>(
+    body: S,
+    min_listeners: u32,
+    location: Location,
+) -> Result<Vec<Feed<'a>>>
 where
     S: AsRef<str>,
 {
@@ -130,7 +138,7 @@ where
             id: id_name_link.href_id,
             name: id_name_link.value.into(),
             listeners,
-            location: Location::new(state_id),
+            location,
             county,
             alert,
         };
@@ -200,22 +208,34 @@ struct Link<'a> {
     value: &'a str,
 }
 
+type LinkID = u32;
+type HrefStart<'a> = &'a str;
+type IDEnd = usize;
+
 impl<'a> Link<'a> {
     fn new(href_id: u32, value: &'a str) -> Self {
         Link { href_id, value }
     }
 
     fn parse(body: &'a str) -> Option<Self> {
-        let href_start = slice_from(body, "href=\"")?;
+        let (href_start, href_id, id_end_pos) = Self::parse_href_info(body)?;
+        // This assumes that the href attribute is the last one in the element
+        let value = slice_to(&href_start[id_end_pos + "\">".len()..], "</a")?;
 
+        Some(Self::new(href_id, value))
+    }
+
+    fn parse_href_id(body: &str) -> Option<LinkID> {
+        Self::parse_href_info(body).map(|(_, href_id, _)| href_id)
+    }
+
+    fn parse_href_info(body: &str) -> Option<(HrefStart, LinkID, IDEnd)> {
+        let href_start = slice_from(body, "href=\"")?;
         let id_end_pos = href_start.find('\"')?;
         let id_value = &href_start[..id_end_pos];
         let id_start_pos = id_value.rfind('/')?;
         let href_id = id_value[id_start_pos + 1..].parse().ok()?;
 
-        // This assumes that the href attribute is the last one in the element
-        let value = slice_to(&href_start[id_end_pos + "\">".len()..], "</a")?;
-
-        Some(Self::new(href_id, value))
+        Some((href_start, href_id, id_end_pos))
     }
 }

@@ -1,3 +1,4 @@
+use crate::feed;
 use notify_rust::Notification;
 use snafu::{Backtrace, ErrorCompat, GenerateBacktrace, Snafu};
 use std::io;
@@ -65,8 +66,11 @@ pub enum Error {
     #[snafu(display("failed to parse top feeds: {}", source))]
     ParseTopFeeds { source: ScrapeError },
 
-    #[snafu(display("failed to parse state feeds: {}", source))]
-    ParseStateFeeds { source: ScrapeError },
+    #[snafu(display("failed to parse feeds for {}: {}", location.abbrev(), source))]
+    ParseLocationFeeds {
+        location: feed::Location,
+        source: ScrapeError,
+    },
 
     #[snafu(display("failed to create notification: {}", source))]
     CreateNotif { source: notify_rust::Error },
@@ -143,6 +147,9 @@ pub enum ScrapeError {
 
     #[snafu(display("missing feed table"))]
     MissingFeedTable,
+
+    #[snafu(display("unknown feed location: {}", id))]
+    UnknownLocation { id: u32 },
 }
 
 pub fn display_error(err: Error) {

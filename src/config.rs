@@ -1,5 +1,5 @@
 use crate::err::{self, Result};
-use crate::feed::Feed;
+use crate::feed::{Feed, Location};
 use crate::path::FilePath;
 use chrono::Weekday;
 use serde::de::Visitor;
@@ -12,6 +12,7 @@ use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 use std::result;
+use std::str::FromStr;
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Config {
@@ -112,7 +113,8 @@ pub struct MiscOptions {
     pub update_time_mins: f32,
     #[serde(default = "MiscOptions::minimum_listeners_default")]
     pub minimum_listeners: u32,
-    pub state_id: Option<u32>,
+    #[serde(rename = "process_location")]
+    pub location: Option<Location>,
     #[serde(default = "MiscOptions::show_max_default")]
     pub show_max: u32,
     pub show_max_times: Option<u32>,
@@ -143,7 +145,7 @@ impl Default for MiscOptions {
         Self {
             update_time_mins: Self::update_time_mins_default(),
             minimum_listeners: Self::minimum_listeners_default(),
-            state_id: None,
+            location: None,
             show_max: Self::show_max_default(),
             show_max_times: None,
             show_alert_feeds: Self::show_alert_feeds_default(),
@@ -198,7 +200,7 @@ pub enum FeedSelector {
     Global,
     ID(u32),
     County(String),
-    State(u32),
+    Location(Location),
 }
 
 impl FeedSelector {
@@ -220,7 +222,7 @@ impl FeedSelector {
                 match sel_name.as_ref() {
                     "id" => sel_value.parse().ok().map(Self::ID),
                     "county" => Some(Self::County(sel_value.into())),
-                    "state" => sel_value.parse().ok().map(Self::State),
+                    "location" => Location::from_str(sel_value).ok().map(Self::Location),
                     _ => None,
                 }
             }
@@ -232,7 +234,7 @@ impl FeedSelector {
             Self::Global => true,
             Self::ID(id) => *id == feed.id,
             Self::County(county) => county.eq_ignore_ascii_case(&feed.county),
-            Self::State(state) => *state == feed.location.state_id,
+            Self::Location(loc) => loc.id() == feed.location.id(),
         }
     }
 }
@@ -254,7 +256,8 @@ impl<'de> Deserialize<'de> for FeedSelector {
             type Value = FeedSelector;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a feed selector (global, id(id), county(name), state(id))")
+                formatter
+                    .write_str("a feed selector (global, id(id), county(name), location(name))")
             }
 
             fn visit_str<E>(self, value: &str) -> result::Result<Self::Value, E>
