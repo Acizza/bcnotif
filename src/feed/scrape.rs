@@ -96,11 +96,16 @@ where
             slice_from(slice, "<table class=\"btable\"").ok_or(ScrapeError::MissingFeedTable)
         };
 
-        // State feeds have two tables with the same class, and the feeds are located in the second one
+        // Feeds in the United States are in the second table, and in the third table otherwise.
         let first = next_table(body)?;
         let second = next_table(first)?;
 
-        tag_body(second, "</table>").ok_or(ScrapeError::MissingFeedTable)?
+        let feed_table = match next_table(second) {
+            Ok(table) => table,
+            Err(_) => second,
+        };
+
+        tag_body(feed_table, "</table>").ok_or(ScrapeError::MissingFeedTable)?
     };
 
     let mut feeds = Vec::with_capacity(200);
