@@ -25,19 +25,38 @@ This program runs in the background, so it can be launched and forgotten about. 
 
 To configure the program, first create and open the file at `~/.config/bcnotif/config.toml`.
 
-In addition to the top 50 feeds on Broadcastify, you can specify the ID of a state that you also want to be processed during an update. This option can be specified as follows in your configuration file:
+In addition to the top 50 feeds on Broadcastify, you can set a specific location that you also want to be processed during an update. This option can be specified like so in your configuration file:
 
 ```toml
 [misc]
-state_id = 6 # California
+process_location = "us-california"
 ```
 
-To obtain a state's ID:
-1. Open [this link](https://www.broadcastify.com/listen/)
-2. Select the state you want to process feeds from
-3. Copy the number from the end of the resulting URL
+The value of the `process_location` field follows the following format:
 
-You can also modify how the program processes feeds using certain "selectors", as well as how they are processed on specific weekdays. These selectors currently include a feed's ID, county, state ID, as well as a global selector to match any feed. This system makes it very easy to make feeds located in your state or county more (or less) sensitive to listener jumps.
+`<country>-<state/province/territory in kebab case>`
+
+For example, New York would look like this:
+
+`us-new-york`
+
+And New South Wales in Austrailia would look like this:
+
+`au-new-south-wales`
+
+Currently, You can only specify locations in the following countries:
+
+* Austrailia
+* Brazil
+* Canada
+* Luxembourg
+* Malaysia
+* Netherlands
+* United States
+
+## Feed Selectors
+
+You can modify how the program processes feeds matching certain "selectors", as well as how they are processed on specific weekdays. These selectors currently include a feed's ID, county, location name, as well as a global selector to match any feed. This system makes it very easy to make feeds located in your state or county more (or less) sensitive to listener jumps.
 
 The following example will require all feeds located in "Sacramento County" to jump in listeners by 50% in order to show an alert:
 
@@ -52,6 +71,18 @@ You can also use this system to only apply your feed settings on specific days o
 [weekday.wednesday."county(Sacramento County)"]
 jump_required = 50
 ```
+
+Same as both examples above, but applied to the entire state of New York:
+
+```toml
+[feed."location(us-new-york)"]
+jump_required = 50
+
+[weekday.wednesday."location(us-new-york)"]
+jump_required = 50
+```
+
+## Full Configuration File Example
 
 The following shows a complete configuration file, will all options filled in various configurations:
 
@@ -69,8 +100,8 @@ jump_required = 70
 [feed.global]
 jump_required = 40
 
-# All feeds in California (state ID 6) will only have to jump by 35% in order to show an alert for them.
-[feed."state(6)"]
+# All feeds in California will only have to jump by 35% in order to show an alert for them.
+[feed."location(us-california)"]
 jump_required = 35
 
 [misc]
@@ -78,8 +109,8 @@ jump_required = 35
 update_time_mins = 6
 # The minimum number of listeners a feed must have to process it. This is the default.
 minimum_listeners = 15
-# The state feeds to process in addition to the top 50 feeds. This is not set by default.
-state_id = 6
+# The location to process in addition to the top 50 feeds. This is not set by default.
+process_location = "us-california"
 # The maximum number of feeds to display an alert for at once. This is the default.
 show_max = 10
 # The maximum number of times to show a feed that's alerting consecutively. This is not set by default.
@@ -97,8 +128,8 @@ order = "descending"
 
 # This section allows you to blacklist and whitelist feeds, using the same selectors that are used in the feed and weekday sections.
 [filters]
-# This will prevent the feed with ID 1, feeds in the county "example county", and all feeds in Alabama (state ID 1) from ever showing. This is not set by default.
-blacklist = [ "id(1)", "county(example county)", "state(1)" ]
-# This only allows feeds in Alaska (state ID 2) and the feed with ID 123 to ever show. This is not set by default.
-whitelist = [ "state(2)", "id(123)" ]
+# This will prevent the feed with ID 1, feeds in the county "example county", and all feeds in Alabama from ever showing. This is not set by default.
+blacklist = [ "id(1)", "county(example county)", "location(us-alabama)" ]
+# This only allows feeds in Alaska and the feed with ID 123 to ever show. This is not set by default.
+whitelist = [ "location(us-alaska)", "id(123)" ]
 ```
