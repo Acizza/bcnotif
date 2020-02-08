@@ -17,8 +17,9 @@ use database::Database;
 use diesel::prelude::*;
 use err::Result;
 use gumdrop::Options;
+use parking_lot::Mutex;
 use smallvec::SmallVec;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc};
 use std::thread;
 
 #[derive(Options)]
@@ -65,7 +66,7 @@ impl Event {
         // This thread should die if something goes horribly wrong, so the uses of unwrap() are intended here
         thread::spawn(move || loop {
             let update_time = {
-                let config = config.lock().unwrap();
+                let config = config.lock();
                 (config.misc.update_time_mins * 60.0) as u64
             };
 
@@ -95,14 +96,7 @@ fn run(args: CmdOptions) -> Result<()> {
         match event_rx.recv() {
             Ok(Event::RunUpdate) => {
                 let cur_time = Utc::now();
-
-                let mut config = match config.lock() {
-                    Ok(config) => config,
-                    Err(_) => {
-                        err::display_error(err::Error::PoisonedMutex { name: "config" });
-                        continue;
-                    }
-                };
+                let mut config = config.lock();
 
                 if args.reload_config {
                     match Config::load() {

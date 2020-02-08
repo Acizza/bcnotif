@@ -60,9 +60,6 @@ pub enum Error {
         backtrace: Backtrace,
     },
 
-    #[snafu(display("mutex lock poisoned for {}", name))]
-    PoisonedMutex { name: &'static str },
-
     #[snafu(display("failed to parse top feeds: {}", source))]
     ParseTopFeeds { source: ScrapeError },
 
