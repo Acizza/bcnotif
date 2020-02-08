@@ -17,7 +17,8 @@ use database::Database;
 use diesel::prelude::*;
 use err::Result;
 use gumdrop::Options;
-use parking_lot::Mutex;
+use once_cell::sync::Lazy;
+use parking_lot::{Condvar, Mutex};
 use smallvec::SmallVec;
 use std::sync::{mpsc, Arc};
 use std::thread;
@@ -76,10 +77,32 @@ impl Event {
     }
 
     fn spawn_signal_handler(tx: mpsc::Sender<Self>) -> Result<()> {
-        ctrlc::set_handler(move || {
+        use nix::sys::signal::{signal, SigHandler, Signal};
+
+        static SIG_TRIGGER: Lazy<(Mutex<()>, Condvar)> =
+            Lazy::new(|| (Mutex::new(()), Condvar::new()));
+
+        extern "C" fn handle_sig(_: libc::c_int) {
+            let (_, cvar) = &*SIG_TRIGGER;
+            cvar.notify_one();
+        }
+
+        let handler = SigHandler::Handler(handle_sig);
+        let sigs = [Signal::SIGHUP, Signal::SIGTERM, Signal::SIGINT];
+
+        unsafe {
+            for &sig in &sigs {
+                signal(sig, handler).map_err(|err| err::Error::Signal { source: err })?;
+            }
+        }
+
+        thread::spawn(move || {
+            let (lock, cvar) = &*SIG_TRIGGER;
+            cvar.wait(&mut lock.lock());
             tx.send(Event::Exit).ok();
-        })
-        .map_err(Into::into)
+        });
+
+        Ok(())
     }
 }
 

@@ -41,12 +41,6 @@ pub enum Error {
         backtrace: Backtrace,
     },
 
-    #[snafu(display("signal handler error: {}", source))]
-    CtrlC {
-        source: ctrlc::Error,
-        backtrace: Backtrace,
-    },
-
     #[snafu(display("error decoding TOML {} file: {}", name, source))]
     TOMLDecode {
         name: &'static str,
@@ -59,6 +53,9 @@ pub enum Error {
         source: mpsc::RecvError,
         backtrace: Backtrace,
     },
+
+    #[snafu(display("failed to register signal handler: {}", source))]
+    Signal { source: nix::Error },
 
     #[snafu(display("failed to parse top feeds: {}", source))]
     ParseTopFeeds { source: ScrapeError },
@@ -112,15 +109,6 @@ impl From<diesel::result::Error> for Error {
 impl From<diesel::result::ConnectionError> for Error {
     fn from(source: diesel::result::ConnectionError) -> Self {
         Self::DieselConnection {
-            source,
-            backtrace: Backtrace::generate(),
-        }
-    }
-}
-
-impl From<ctrlc::Error> for Error {
-    fn from(source: ctrlc::Error) -> Self {
-        Self::CtrlC {
             source,
             backtrace: Backtrace::generate(),
         }
