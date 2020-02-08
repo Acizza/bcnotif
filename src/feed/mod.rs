@@ -274,6 +274,16 @@ pub enum Location {
 }
 
 impl Location {
+    const LISTED_COUNTRIES: [&'static str; 7] = [
+        "United States",
+        "Canada",
+        "Austrailia",
+        "Netherlands",
+        "Malaysia",
+        "Luxembourg",
+        "Brazil",
+    ];
+
     #[inline(always)]
     pub fn id(self) -> u32 {
         self as u32
@@ -391,7 +401,8 @@ impl<'de> Deserialize<'de> for Location {
             type Value = Location;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a state / province / territory name located in the United States / Canada / Austrailia")
+                let country_list = Location::LISTED_COUNTRIES.join("\n\t");
+                formatter.write_str(&format!("a state / province / territory located in one of the following countries:\n\t{}\n", country_list))
             }
 
             fn visit_str<E>(self, value: &str) -> result::Result<Self::Value, E>
