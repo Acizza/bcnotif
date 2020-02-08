@@ -144,13 +144,7 @@ fn run(args: CmdOptions) -> Result<()> {
                     remove_old_feeds_time = cur_time + Duration::hours(12);
                 }
             }
-            Ok(Event::Exit) => {
-                if let Err(err) = db.optimize() {
-                    err::display_error(err.into());
-                }
-
-                break Ok(());
-            }
+            Ok(Event::Exit) => break Ok(()),
             Err(err) => break Err(err.into()),
         }
     }

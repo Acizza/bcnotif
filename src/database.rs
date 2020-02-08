@@ -29,10 +29,6 @@ impl Database {
         Ok(Self(conn))
     }
 
-    pub fn optimize(&self) -> diesel::QueryResult<usize> {
-        self.conn().execute("PRAGMA optimize")
-    }
-
     pub fn validated_path() -> Result<PathBuf> {
         let mut path = FilePath::LocalData.validated_dir_path()?;
         path.push("data.sqlite");
@@ -42,6 +38,12 @@ impl Database {
     #[inline(always)]
     pub fn conn(&self) -> &SqliteConnection {
         &self.0
+    }
+}
+
+impl Drop for Database {
+    fn drop(&mut self) {
+        self.conn().execute("PRAGMA optimize").ok();
     }
 }
 
