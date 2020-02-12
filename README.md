@@ -49,6 +49,7 @@ Currently, You can only specify locations in the following countries:
 * Austrailia
 * Brazil
 * Canada
+* Chile
 * Luxembourg
 * Malaysia
 * Netherlands

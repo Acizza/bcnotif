@@ -271,17 +271,23 @@ pub enum Location {
     LuCountrywide = 252,
     // Brazil
     BrCountrywide = 345,
+    // Chile
+    ClValparaiso = 714,
+    ClBiobio = 717,
+    ClAraucania,
+    ClSantiago = 723,
 }
 
 impl Location {
-    const LISTED_COUNTRIES: [&'static str; 7] = [
-        "United States",
-        "Canada",
+    const LISTED_COUNTRIES: [&'static str; 8] = [
         "Austrailia",
-        "Netherlands",
-        "Malaysia",
-        "Luxembourg",
         "Brazil",
+        "Canada",
+        "Chile",
+        "Luxembourg",
+        "Malaysia",
+        "Netherlands",
+        "United States",
     ];
 
     #[inline(always)]
@@ -386,6 +392,11 @@ impl Location {
             Self::LuCountrywide => "LU-ALL",
             // Brazil
             Self::BrCountrywide => "BR-ALL",
+            // Chile
+            Self::ClValparaiso => "CL-VL",
+            Self::ClBiobio => "CL-BI",
+            Self::ClAraucania => "CL-AR",
+            Self::ClSantiago => "CL-RM",
         }
     }
 }
