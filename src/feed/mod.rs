@@ -5,8 +5,6 @@ mod scrape;
 use crate::config::Config;
 use crate::err::{self, Result};
 use notify_rust::Notification;
-use once_cell::sync::Lazy;
-use reqwest::blocking::Client;
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
 use snafu::ResultExt;
@@ -46,9 +44,15 @@ impl<'a> Feed<'a> {
     }
 
     fn scrape_source(source: Source, min_listeners: u32) -> Result<Vec<Self>> {
-        static CLIENT: Lazy<Client> = Lazy::new(Client::new);
+        let resp = ureq::get(source.url().as_ref())
+            .timeout_connect(15_000)
+            .call();
 
-        let body = CLIENT.get(source.url().as_ref()).send()?.text()?;
+        if let Some(err) = resp.synthetic_error() {
+            return Err(err.into());
+        }
+
+        let body = resp.into_string().context(err::HttpIO)?;
 
         match source {
             Source::Top50 => scrape::scrape_top(&body, min_listeners).context(err::ParseTopFeeds),

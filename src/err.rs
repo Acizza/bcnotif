@@ -23,9 +23,16 @@ pub enum Error {
         backtrace: Backtrace,
     },
 
-    #[snafu(display("reqwest error: {}", source))]
-    Reqwest {
-        source: reqwest::Error,
+    #[snafu(display("http error: {}", msg))]
+    Http {
+        msg: String,
+        status: u16,
+        backtrace: Backtrace,
+    },
+
+    #[snafu(display("http io error: {}", source))]
+    HttpIO {
+        source: io::Error,
         backtrace: Backtrace,
     },
 
@@ -88,10 +95,11 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<reqwest::Error> for Error {
-    fn from(source: reqwest::Error) -> Self {
-        Self::Reqwest {
-            source,
+impl From<&ureq::Error> for Error {
+    fn from(source: &ureq::Error) -> Self {
+        Self::Http {
+            msg: format!("{}", source),
+            status: source.status(),
             backtrace: Backtrace::generate(),
         }
     }
