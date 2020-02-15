@@ -5,6 +5,7 @@ mod scrape;
 use crate::config::Config;
 use crate::err::{self, Result};
 use notify_rust::Notification;
+use once_cell::sync::Lazy;
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
 use snafu::ResultExt;
@@ -44,7 +45,14 @@ impl<'a> Feed<'a> {
     }
 
     fn scrape_source(source: Source, min_listeners: u32) -> Result<Vec<Self>> {
-        let resp = ureq::get(source.url().as_ref())
+        static REQ_AGENT: Lazy<ureq::Agent> = Lazy::new(|| {
+            let mut agent = ureq::agent();
+            agent.set("Connection", "keep-alive");
+            agent
+        });
+
+        let resp = REQ_AGENT
+            .get(source.url().as_ref())
             .timeout_connect(15_000)
             .call();
 
