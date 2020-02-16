@@ -10,6 +10,7 @@ This project requires the following dependencies:
 
 * A recent stable version of Rust
 * SQLite
+* dbus
 * pkg-config
 
 Note that pkg-config is most likely already installed. If your distribution does not provide a recent version of Rust, you can obtain the latest version [here](https://rustup.rs/).
