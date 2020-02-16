@@ -54,6 +54,7 @@ impl<'a> Feed<'a> {
         let resp = REQ_AGENT
             .get(source.url().as_ref())
             .timeout_connect(15_000)
+            .timeout_read(15_000)
             .call();
 
         if let Some(err) = resp.synthetic_error() {
