@@ -5,7 +5,6 @@ mod scrape;
 use crate::config::Config;
 use crate::err::{self, Result};
 use notify_rust::Notification;
-use once_cell::sync::Lazy;
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
 use snafu::ResultExt;
@@ -29,11 +28,13 @@ pub struct Feed<'a> {
 
 impl<'a> Feed<'a> {
     pub fn scrape_all(config: &Config) -> Result<Vec<Self>> {
-        let mut feeds = Self::scrape_source(Source::Top50, config.misc.minimum_listeners)?;
+        let agent = ureq::agent();
+
+        let mut feeds = Self::scrape_source(Source::Top50, config.misc.minimum_listeners, &agent)?;
 
         if let Some(loc) = config.misc.location {
             let loc_feeds =
-                Self::scrape_source(Source::Location(loc), config.misc.minimum_listeners)?;
+                Self::scrape_source(Source::Location(loc), config.misc.minimum_listeners, &agent)?;
 
             feeds.extend(loc_feeds);
         }
@@ -44,14 +45,8 @@ impl<'a> Feed<'a> {
         Ok(feeds)
     }
 
-    fn scrape_source(source: Source, min_listeners: u32) -> Result<Vec<Self>> {
-        static REQ_AGENT: Lazy<ureq::Agent> = Lazy::new(|| {
-            let mut agent = ureq::agent();
-            agent.set("Connection", "keep-alive");
-            agent
-        });
-
-        let resp = REQ_AGENT
+    fn scrape_source(source: Source, min_listeners: u32, agent: &ureq::Agent) -> Result<Vec<Self>> {
+        let resp = agent
             .get(source.url().as_ref())
             .timeout_connect(15_000)
             .timeout_read(15_000)
