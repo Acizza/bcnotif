@@ -74,7 +74,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to create notification: {}", source))]
-    CreateNotif { source: notify_rust::Error },
+    CreateNotif { source: notify_rust::error::Error },
 }
 
 impl Error {
