@@ -11,14 +11,14 @@ pub enum FilePath {
 impl FilePath {
     pub fn validated_dir_path(&self) -> Result<PathBuf> {
         static CONFIG_DIR: Lazy<PathBuf> = Lazy::new(|| {
-            let mut dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("~/.config/"));
+            let mut dir = dirs_next::config_dir().unwrap_or_else(|| PathBuf::from("~/.config/"));
             dir.push(env!("CARGO_PKG_NAME"));
             dir
         });
 
         static LOCAL_DATA_PATH: Lazy<PathBuf> = Lazy::new(|| {
             let mut dir =
-                dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("~/.local/share/"));
+                dirs_next::data_local_dir().unwrap_or_else(|| PathBuf::from("~/.local/share/"));
             dir.push(env!("CARGO_PKG_NAME"));
             dir
         });
