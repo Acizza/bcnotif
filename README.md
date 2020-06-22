@@ -1,6 +1,6 @@
 # bcnotif
 
-[![dependency status](https://deps.rs/repo/github/acizza/bcnotif/status.svg)](https://deps.rs/repo/github/acizza/bcnotif)
+[![total lines](https://tokei.rs/b1/github/acizza/bcnotif)](https://github.com/acizza/bcnotif)
 
 This is a Linux program to find audio feeds on Broadcastify that suddenly jump in listeners (or have an alert) and display a desktop notification for them, as a sudden jump in listeners usually means that some kind of event or emergency is happening. Since some people tune into feeds as soon as they see / hear an incident occuring, you can usually get notified of large incidents (such as mass shootings) faster than you would following the news.
 
