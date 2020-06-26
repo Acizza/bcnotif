@@ -11,11 +11,11 @@ mod path;
 
 use crate::feed::stats::{ListenerAvg, ListenerStatMap, ListenerStats};
 use crate::feed::{Feed, FeedNotif};
+use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Datelike, Duration, Local, Timelike, Utc};
 use config::Config;
 use database::Database;
 use diesel::prelude::*;
-use err::Result;
 use once_cell::sync::Lazy;
 use parking_lot::{Condvar, Mutex};
 use smallvec::SmallVec;
@@ -52,20 +52,68 @@ impl CmdOptions {
     }
 }
 
-fn main() {
+fn main() -> Result<()> {
     let args = match CmdOptions::from_env() {
         Ok(args) => args,
         Err(err) => {
-            err::display_error(err);
-            std::process::exit(1);
+            err::error_notif(&err);
+            return Err(err);
         }
     };
 
-    match run(args) {
-        Ok(_) => (),
-        Err(err) => {
-            err::display_error(err);
-            std::process::exit(1);
+    let result = run(args);
+
+    if let Err(err) = &result {
+        err::error_notif(err);
+    }
+
+    result
+}
+
+fn run(args: CmdOptions) -> Result<()> {
+    let config = {
+        let cfg = Config::load_or_new().context("failed to load / create config")?;
+        Arc::new(Mutex::new(cfg))
+    };
+
+    let db = Database::open().context("failed to open feed database")?;
+
+    let mut listener_stats = ListenerStatMap::with_capacity(200);
+    let mut remove_old_feeds_time = Utc::now();
+
+    let event_rx = Event::init_threads(&config).context("failed to init event threads")?;
+
+    loop {
+        match event_rx.recv() {
+            Ok(Event::RunUpdate) => {
+                let cur_time = Utc::now();
+                let mut config = config.lock();
+
+                if args.reload_config {
+                    match Config::load() {
+                        Ok(new) => *config = new,
+                        Err(err) => err::error_notif(&err),
+                    }
+                }
+
+                let result = run_update(&db, &config, &cur_time, &mut listener_stats).and_then(
+                    |mut notifs| {
+                        FeedNotif::sort_all(&mut notifs, &config);
+                        FeedNotif::show_all(&notifs)
+                    },
+                );
+
+                if let Err(err) = result {
+                    err::error_notif(&err);
+                }
+
+                if cur_time >= remove_old_feeds_time {
+                    ListenerAvg::remove_old_from_db(&db)?;
+                    remove_old_feeds_time = cur_time + Duration::hours(12);
+                }
+            }
+            Ok(Event::Exit) => break Ok(()),
+            Err(err) => break Err(err.into()),
         }
     }
 }
@@ -80,7 +128,7 @@ impl Event {
         let (tx, rx) = mpsc::channel();
 
         Self::spawn_update_thread(tx.clone(), config);
-        Self::spawn_signal_handler(tx)?;
+        Self::spawn_signal_handler(tx).context("signal handler spawn failed")?;
 
         Ok(rx)
     }
@@ -98,7 +146,10 @@ impl Event {
                 (config.misc.update_time_mins * 60.0) as u64
             };
 
-            tx.send(Event::RunUpdate).unwrap();
+            if tx.send(Event::RunUpdate).is_err() {
+                break;
+            }
+
             thread::sleep(std::time::Duration::from_secs(update_time));
         })
     }
@@ -119,7 +170,8 @@ impl Event {
 
         unsafe {
             for &sig in &sigs {
-                signal(sig, handler).map_err(|err| err::Error::Signal { source: err })?;
+                signal(sig, handler)
+                    .map_err(|err| anyhow!("failed to register signal handler: {}", err))?;
             }
         }
 
@@ -133,50 +185,6 @@ impl Event {
     }
 }
 
-fn run(args: CmdOptions) -> Result<()> {
-    let config = Arc::new(Mutex::new(Config::load_or_new()?));
-    let db = Database::open()?;
-
-    let mut listener_stats = ListenerStatMap::with_capacity(200);
-    let mut remove_old_feeds_time = Utc::now();
-
-    let event_rx = Event::init_threads(&config)?;
-
-    loop {
-        match event_rx.recv() {
-            Ok(Event::RunUpdate) => {
-                let cur_time = Utc::now();
-                let mut config = config.lock();
-
-                if args.reload_config {
-                    match Config::load() {
-                        Ok(new) => *config = new,
-                        Err(err) => err::display_error(err),
-                    }
-                }
-
-                let result = run_update(&db, &config, &cur_time, &mut listener_stats).and_then(
-                    |mut notifs| {
-                        FeedNotif::sort_all(&mut notifs, &config);
-                        FeedNotif::show_all(&notifs)
-                    },
-                );
-
-                if let Err(err) = result {
-                    err::display_error(err);
-                }
-
-                if cur_time >= remove_old_feeds_time {
-                    ListenerAvg::remove_old_from_db(&db)?;
-                    remove_old_feeds_time = cur_time + Duration::hours(12);
-                }
-            }
-            Ok(Event::Exit) => break Ok(()),
-            Err(err) => break Err(err.into()),
-        }
-    }
-}
-
 fn run_update<'a>(
     db: &Database,
     config: &Config,
@@ -186,7 +194,7 @@ fn run_update<'a>(
     use diesel::result::Error;
 
     let feeds = {
-        let mut feeds = Feed::scrape_all(config)?;
+        let mut feeds = Feed::scrape_all(config).context("feed scraping failed")?;
         filter_feeds(config, &mut feeds);
         feeds
     };
@@ -196,28 +204,30 @@ fn run_update<'a>(
 
     let mut display = SmallVec::new();
 
-    db.conn().transaction::<_, Error, _>(|| {
-        for feed in feeds {
-            let stats = listener_stats.entry(feed.id).or_insert_with(|| {
-                ListenerStats::init_from_db(db, cur_hour, feed.id as i32, feed.listeners as f32)
-            });
+    db.conn()
+        .transaction::<_, Error, _>(|| {
+            for feed in feeds {
+                let stats = listener_stats.entry(feed.id).or_insert_with(|| {
+                    ListenerStats::init_from_db(db, cur_hour, feed.id as i32, feed.listeners as f32)
+                });
 
-            stats.update(cur_hour, &feed, config, cur_weekday);
-            stats.save_to_db(db)?;
+                stats.update(cur_hour, &feed, config, cur_weekday);
+                stats.save_to_db(db)?;
 
-            if !stats.should_display_feed(&feed, config) {
-                continue;
+                if !stats.should_display_feed(&feed, config) {
+                    continue;
+                }
+
+                if display.len() > config.misc.show_max as usize {
+                    continue;
+                }
+
+                display.push(FeedNotif::new(feed, stats));
             }
 
-            if display.len() > config.misc.show_max as usize {
-                continue;
-            }
-
-            display.push(FeedNotif::new(feed, stats));
-        }
-
-        Ok(())
-    })?;
+            Ok(())
+        })
+        .context("database transaction failed")?;
 
     Ok(display)
 }

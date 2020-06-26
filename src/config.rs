@@ -1,11 +1,11 @@
-use crate::err::{self, Result};
+use crate::err;
 use crate::feed::{Feed, Location};
 use crate::path::FilePath;
+use anyhow::{anyhow, Context, Result};
 use chrono::Weekday;
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
 use serde_derive::Deserialize;
-use snafu::ResultExt;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
@@ -32,20 +32,28 @@ impl Config {
     pub fn load_or_new() -> Result<Self> {
         match Self::load() {
             Ok(cfg) => Ok(cfg),
-            Err(err) if err.is_file_nonexistant() => Ok(Self::default()),
+            Err(err) if err::is_file_nonexistant(&err) => Ok(Self::default()),
             err => err,
         }
     }
 
     pub fn load() -> Result<Self> {
         let path = Self::validated_path()?;
-        let contents = fs::read_to_string(&path).context(err::FileIO { path })?;
-        let config = toml::from_str(&contents).context(err::TOMLDecode { name: "config" })?;
+
+        let contents = fs::read_to_string(&path)
+            .with_context(|| anyhow!("failed to load config at {}", path.display()))?;
+
+        let config = toml::from_str(&contents)
+            .with_context(|| anyhow!("failed to decode config at {}", path.display()))?;
+
         Ok(config)
     }
 
     pub fn validated_path() -> Result<PathBuf> {
-        let mut path = FilePath::Config.validated_dir_path()?;
+        let mut path = FilePath::Config
+            .validated_dir_path()
+            .context("failed to get config path")?;
+
         path.push("config.toml");
         Ok(path)
     }

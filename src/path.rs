@@ -1,4 +1,4 @@
-use crate::err::Result;
+use anyhow::{Context, Result};
 use once_cell::sync::Lazy;
 use std::fs;
 use std::path::PathBuf;
@@ -29,7 +29,7 @@ impl FilePath {
         };
 
         if !dir.exists() {
-            fs::create_dir_all(&dir)?;
+            fs::create_dir_all(&dir).context("dir creation failed")?;
         }
 
         Ok(dir)

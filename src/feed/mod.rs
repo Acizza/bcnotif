@@ -3,11 +3,10 @@ pub mod stats;
 mod scrape;
 
 use crate::config::Config;
-use crate::err::{self, Result};
+use anyhow::{anyhow, Context, Result};
 use notify_rust::Notification;
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
-use snafu::ResultExt;
 use stats::ListenerStats;
 use std::borrow::Cow;
 use std::cmp::{self, Eq, Ord};
@@ -53,15 +52,19 @@ impl<'a> Feed<'a> {
             .call();
 
         if let Some(err) = resp.synthetic_error() {
-            return Err(err.into());
+            return Err(anyhow!("http error: {}", err));
         }
 
-        let body = resp.into_string().context(err::HttpIO)?;
+        let body = resp
+            .into_string()
+            .map_err(|err| anyhow!("http error: {}", err))?;
 
         match source {
-            Source::Top50 => scrape::scrape_top(&body, min_listeners).context(err::ParseTopFeeds),
+            Source::Top50 => {
+                scrape::scrape_top(&body, min_listeners).context("failed to parse top 50 feeds")
+            }
             Source::Location(location) => scrape::scrape_location(&body, min_listeners, location)
-                .context(err::ParseLocationFeeds { location }),
+                .with_context(|| anyhow!("failed to parse feeds for {}", location.abbrev())),
         }
     }
 }
@@ -140,7 +143,7 @@ impl<'a> FeedNotif<'a> {
             .summary(&title)
             .body(&body)
             .show()
-            .context(err::CreateNotif)
+            .map_err(|err| anyhow!("failed to create notification: {}", err))
             .map(|_| ())
     }
 

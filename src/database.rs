@@ -1,5 +1,5 @@
-use crate::err::Result;
 use crate::path::FilePath;
+use anyhow::{Context, Result};
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use std::path::PathBuf;
@@ -21,16 +21,21 @@ pub struct Database(SqliteConnection);
 
 impl Database {
     pub fn open() -> Result<Self> {
-        let path = Self::validated_path()?;
-        let conn = SqliteConnection::establish(&path.to_string_lossy())?;
+        let path = Self::validated_path().context("getting database path failed")?;
+        let conn = SqliteConnection::establish(&path.to_string_lossy())
+            .context("opening database connection failed")?;
 
-        conn.batch_execute(include_str!("../sql/schema.sql"))?;
+        conn.batch_execute(include_str!("../sql/schema.sql"))
+            .context("executing database schema failed")?;
 
         Ok(Self(conn))
     }
 
     pub fn validated_path() -> Result<PathBuf> {
-        let mut path = FilePath::LocalData.validated_dir_path()?;
+        let mut path = FilePath::LocalData
+            .validated_dir_path()
+            .context("getting local data path failed")?;
+
         path.push("data.sqlite");
         Ok(path)
     }

@@ -1,8 +1,20 @@
-use crate::err::ScrapeError;
 use crate::feed::{Feed, Location};
 use num_traits::FromPrimitive;
 use smallvec::SmallVec;
 use std::borrow::Cow;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum ScrapeError {
+    #[error("no feeds found")]
+    NoFeeds,
+
+    #[error("missing feed table")]
+    MissingFeedTable,
+
+    #[error("unknown feed location id: {0}")]
+    UnknownLocationID(u32),
+}
 
 type Result<T> = std::result::Result<T, ScrapeError>;
 
@@ -58,7 +70,7 @@ where
             };
 
             let location = Location::from_i64(loc_id as i64)
-                .ok_or_else(|| ScrapeError::UnknownLocation { id: loc_id })?;
+                .ok_or_else(|| ScrapeError::UnknownLocationID(loc_id))?;
 
             (location, county)
         };

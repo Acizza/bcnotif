@@ -1,7 +1,6 @@
 use crate::config::Config;
 use crate::database::listener_avgs;
 use crate::database::Database;
-use crate::err::Result;
 use crate::feed::Feed;
 use chrono::{Duration, Utc, Weekday};
 use diesel::prelude::*;
@@ -93,13 +92,9 @@ impl ListenerAvg {
         }
     }
 
-    pub fn load(db: &Database, feed_id: i32) -> Result<Self> {
+    pub fn load(db: &Database, feed_id: i32) -> diesel::QueryResult<Self> {
         use crate::database::listener_avgs::dsl::*;
-
-        listener_avgs
-            .filter(id.eq(feed_id))
-            .get_result(db.conn())
-            .map_err(Into::into)
+        listener_avgs.filter(id.eq(feed_id)).get_result(db.conn())
     }
 
     pub fn load_or_new(db: &Database, feed_id: i32) -> Self {
