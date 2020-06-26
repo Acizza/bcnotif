@@ -22,7 +22,11 @@ strum = "~0.18.0"
 strum_macros = "~0.18.0"
 thiserror = "~1.0.0"
 toml = "~0.5.0"
-ureq = "~1.2.0"
+
+[dependencies.attohttpc]
+version = "~0.14.0"
+default-features = false
+features = [ "tls-rustls" ]
 
 [dependencies.chrono]
 version = "~0.4.0"

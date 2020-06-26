@@ -13,6 +13,7 @@ use std::cmp::{self, Eq, Ord};
 use std::fmt;
 use std::result;
 use std::str::FromStr;
+use std::time::Duration;
 use strum_macros::EnumString;
 
 #[derive(Debug)]
@@ -27,13 +28,11 @@ pub struct Feed<'a> {
 
 impl<'a> Feed<'a> {
     pub fn scrape_all(config: &Config) -> Result<Vec<Self>> {
-        let agent = ureq::agent();
-
-        let mut feeds = Self::scrape_source(Source::Top50, config.misc.minimum_listeners, &agent)?;
+        let mut feeds = Self::scrape_source(Source::Top50, config.misc.minimum_listeners)?;
 
         if let Some(loc) = config.misc.location {
             let loc_feeds =
-                Self::scrape_source(Source::Location(loc), config.misc.minimum_listeners, &agent)?;
+                Self::scrape_source(Source::Location(loc), config.misc.minimum_listeners)?;
 
             feeds.extend(loc_feeds);
         }
@@ -44,20 +43,20 @@ impl<'a> Feed<'a> {
         Ok(feeds)
     }
 
-    fn scrape_source(source: Source, min_listeners: u32, agent: &ureq::Agent) -> Result<Vec<Self>> {
-        let resp = agent
-            .get(source.url().as_ref())
-            .timeout_connect(15_000)
-            .timeout_read(15_000)
-            .call();
+    fn scrape_source(source: Source, min_listeners: u32) -> Result<Vec<Self>> {
+        let resp = attohttpc::get(source.url().as_ref())
+            .timeout(Duration::from_secs(15))
+            .send()
+            .context("http request failed")?;
 
-        if let Some(err) = resp.synthetic_error() {
-            return Err(anyhow!("http error: {}", err));
+        if !resp.is_success() {
+            return Err(anyhow!(
+                "received bad status from Broadcastify: {}",
+                resp.status()
+            ));
         }
 
-        let body = resp
-            .into_string()
-            .map_err(|err| anyhow!("http error: {}", err))?;
+        let body = resp.text().context("failed to read text from response")?;
 
         match source {
             Source::Top50 => {
