@@ -16,23 +16,50 @@ use config::Config;
 use database::Database;
 use diesel::prelude::*;
 use err::Result;
-use gumdrop::Options;
 use once_cell::sync::Lazy;
 use parking_lot::{Condvar, Mutex};
 use smallvec::SmallVec;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
-#[derive(Options)]
 struct CmdOptions {
-    #[options(help = "print help message")]
-    help: bool,
-    #[options(help = "reload the configuration file on each update")]
     reload_config: bool,
 }
 
+impl CmdOptions {
+    fn from_env() -> Result<Self> {
+        let mut args = pico_args::Arguments::from_env();
+
+        if args.contains(["-h", "--help"]) {
+            Self::print_help();
+        }
+
+        let result = Self {
+            reload_config: args.contains(["-r", "--reload"]),
+        };
+
+        Ok(result)
+    }
+
+    fn print_help() {
+        println!(concat!("Usage: ", env!("CARGO_PKG_NAME"), " [OPTIONS]\n"));
+
+        println!("Optional arguments:");
+        println!("  -h, --help    show this message");
+        println!("  -r, --reload  reload the configuration file on each update");
+
+        std::process::exit(0);
+    }
+}
+
 fn main() {
-    let args = CmdOptions::parse_args_default_or_exit();
+    let args = match CmdOptions::from_env() {
+        Ok(args) => args,
+        Err(err) => {
+            err::display_error(err);
+            std::process::exit(1);
+        }
+    };
 
     match run(args) {
         Ok(_) => (),
