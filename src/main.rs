@@ -27,18 +27,16 @@ struct CmdOptions {
 }
 
 impl CmdOptions {
-    fn from_env() -> Result<Self> {
+    fn from_env() -> Self {
         let mut args = pico_args::Arguments::from_env();
 
         if args.contains(["-h", "--help"]) {
             Self::print_help();
         }
 
-        let result = Self {
+        Self {
             reload_config: args.contains(["-r", "--reload"]),
-        };
-
-        Ok(result)
+        }
     }
 
     fn print_help() {
@@ -53,14 +51,7 @@ impl CmdOptions {
 }
 
 fn main() -> Result<()> {
-    let args = match CmdOptions::from_env() {
-        Ok(args) => args,
-        Err(err) => {
-            err::error_notif(&err);
-            return Err(err);
-        }
-    };
-
+    let args = CmdOptions::from_env();
     let result = run(args);
 
     if let Err(err) = &result {
