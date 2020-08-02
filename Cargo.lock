@@ -64,8 +64,8 @@ dependencies = [
  "serde",
  "serde_derive",
  "smallvec",
- "strum 0.18.0",
- "strum_macros 0.18.0",
+ "strum 0.19.1",
+ "strum_macros 0.19.1",
  "thiserror",
  "toml",
 ]
@@ -643,9 +643,9 @@ checksum = "4ca6e4730f517e041e547ffe23d29daab8de6b73af4b6ae2a002108169f5e7da"
 
 [[package]]
 name = "strum"
-version = "0.18.0"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57bd81eb48f4c437cadc685403cad539345bf703d78e63707418431cecd4522b"
+checksum = "548779cd5867cc3c58521a613620578cf6cedc557d7dd5d51081f1c4c46adfa6"
 
 [[package]]
 name = "strum_macros"
@@ -659,9 +659,9 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.18.0"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87c85aa3f8ea653bfd3ddf25f7ee357ee4d204731f6aa9ad04002306f6e2774c"
+checksum = "875812c05b8135f41dc640a3e268bdebbd832576a05cf56471fc1eb70c602eb6"
 dependencies = [
  "heck",
  "proc-macro2",
