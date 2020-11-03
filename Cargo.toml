@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-dirs-next = "1.0"
+dirs-next = "2.0"
 libc = "0.2"
 nix = "0.18"
 notify-rust = "4.0"
